@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import MarkdownRenderer from './MarkdownRenderer.svelte';
 
 	// Accept repository as a prop
 	let { 
@@ -20,6 +21,8 @@
 	let isSpeaking = $state(false);
 	let isVoiceMode = $state(false); // Track if voice mode is active
 	let error = $state('');
+	let isLoadingRepo = $state(false);
+	let repoLoadStatus = $state('');
 	let transcript = $state<Array<{ role: string; text: string }>>([]);
 	let audioWorklet: AudioWorkletNode | null = null;
 	let audioQueue: Array<ArrayBuffer> = [];
@@ -72,8 +75,34 @@
 				const data = JSON.parse(event.data);
 				console.log('WebSocket message:', data.type, data);
 
-				// Handle different event types from OpenAI
+				// Handle different event types from OpenAI and custom server messages
 				switch (data.type) {
+					case 'repo.loading':
+						// Handle repository loading status
+						if (data.status === 'started') {
+							isLoadingRepo = true;
+							repoLoadStatus = `Loading ${data.repository}...`;
+						} else if (data.status === 'completed') {
+							isLoadingRepo = false;
+							repoLoadStatus = `Loaded ${data.fileCount} files (${data.totalSize}KB)`;
+							// Clear status after 3 seconds
+							setTimeout(() => {
+								repoLoadStatus = '';
+							}, 3000);
+						} else if (data.status === 'error') {
+							isLoadingRepo = false;
+							repoLoadStatus = '';
+							error = `Failed to load repository: ${data.error}`;
+						}
+						break;
+
+					case 'github.issue_created':
+						// Handle issue creation notification
+						console.log('GitHub issue created:', data.issue);
+						// Add a system message to transcript
+						addTranscript('system', `✅ Created issue #${data.issue.number}: ${data.issue.title}`);
+						break;
+
 					case 'session.created':
 						console.log('Session created:', data);
 						break;
@@ -547,6 +576,19 @@
 		</div>
 		
 		<div class="nav-right">
+			{#if isLoadingRepo}
+				<div class="status-pill loading">
+					<span class="spinner"></span>
+					<span>{repoLoadStatus}</span>
+				</div>
+			{:else if repoLoadStatus}
+				<div class="status-pill success">
+					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<polyline points="20 6 9 17 4 12"></polyline>
+					</svg>
+					<span>{repoLoadStatus}</span>
+				</div>
+			{/if}
 			{#if isRecording}
 				<div class="status-pill recording">
 					<span class="pulse"></span>
@@ -588,7 +630,9 @@
 					{#each transcript as message, index}
 						<div class="message-wrapper {message.role}">
 							<div class="message-bubble">
-								<div class="message-content">{message.text}</div>
+								<div class="message-content">
+									<MarkdownRenderer content={message.text} />
+								</div>
 							</div>
 						</div>
 					{/each}
@@ -742,6 +786,29 @@
 		border: 1px solid rgba(59, 130, 246, 0.3);
 	}
 
+	.status-pill.loading {
+		color: #f59e0b;
+		border: 1px solid rgba(245, 158, 11, 0.3);
+	}
+
+	.status-pill.success {
+		color: #10b981;
+		border: 1px solid rgba(16, 185, 129, 0.3);
+	}
+
+	.spinner {
+		width: 12px;
+		height: 12px;
+		border: 2px solid rgba(245, 158, 11, 0.3);
+		border-top-color: currentColor;
+		border-radius: 50%;
+		animation: spin 0.8s linear infinite;
+	}
+
+	@keyframes spin {
+		to { transform: rotate(360deg); }
+	}
+
 	.user-pill {
 		display: flex;
 		align-items: center;
@@ -837,6 +904,10 @@
 		justify-content: flex-start;
 	}
 
+	.message-wrapper.system {
+		justify-content: center;
+	}
+
 	.message-bubble {
 		max-width: 75%;
 		padding: 1rem 1.25rem;
@@ -856,6 +927,16 @@
 		border: 1px solid #222222;
 		color: #e5e5e5;
 		border-bottom-left-radius: 0.375rem;
+	}
+
+	.message-wrapper.system .message-bubble {
+		background: rgba(34, 197, 94, 0.1);
+		border: 1px solid rgba(34, 197, 94, 0.3);
+		color: #86efac;
+		border-radius: 0.5rem;
+		font-size: 0.875rem;
+		padding: 0.75rem 1rem;
+		max-width: 50%;
 	}
 
 	.message-content {
