@@ -1,3 +1,91 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
+
+/* Navigation Styles */
+.navbar {
+	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+	padding: 1rem 0;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.nav-container {
+	max-width: 1200px;
+	margin: 0 auto;
+	padding: 0 2rem;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+
+.nav-brand {
+	font-size: 1.5rem;
+	font-weight: 700;
+	color: white;
+	text-decoration: none;
+}
+
+.nav-links {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+}
+
+.user-info {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	color: white;
+	font-weight: 500;
+}
+
+.user-avatar {
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	border: 2px solid white;
+}
+
+/* Button Styles */
+.btn {
+	padding: 0.5rem 1.25rem;
+	border-radius: 0.5rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition: all 0.2s;
+	border: none;
+	font-size: 0.95rem;
+}
+
+.btn-primary {
+	background: white;
+	color: #667eea;
+}
+
+.btn-primary:hover {
+	background: #f3f4f6;
+	transform: translateY(-1px);
+}
+
+.btn-secondary {
+	background: rgba(255, 255, 255, 0.2);
+	color: white;
+	border: 1px solid white;
+}
+
+.btn-secondary:hover {
+	background: rgba(255, 255, 255, 0.3);
+}
+
+.btn-reauth {
+	background: rgba(255, 255, 255, 0.95);
+	color: #667eea;
+	border: 1px solid rgba(255, 255, 255, 0.3);
+	font-size: 0.9rem;
+}
+
+.btn-reauth:hover {
+	background: white;
+	transform: translateY(-1px);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}

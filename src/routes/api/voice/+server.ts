@@ -1,4 +1,6 @@
 import type { RequestHandler } from './$types';
+// @ts-ignore - Vite raw import
+import githubIssueContext from '../../../../GITHUB_ISSUE_CHATBOT.md?raw';
 
 export const GET: RequestHandler = async ({ request, platform }) => {
 	const upgradeHeader = request.headers.get('Upgrade');
@@ -49,13 +51,29 @@ export const GET: RequestHandler = async ({ request, platform }) => {
 	openaiWs.addEventListener('open', () => {
 		console.log('Connected to OpenAI Realtime API');
 
+		// Build instructions with GitHub Issue Chatbot context
+		const instructions = `You are a helpful AI assistant specialized in creating well-formed GitHub issues. You help users through a conversational interface to gather issue details and format them according to Agile best practices.
+
+Here is your complete project context and guidelines:
+
+${githubIssueContext}
+
+Your role is to:
+1. Help users create GitHub issues through natural conversation
+2. Ask clarifying questions to gather all necessary details
+3. Format issues as proper Agile user stories when appropriate
+4. Follow the INVEST principles for user stories
+5. Provide clear acceptance criteria and definitions of done
+6. Be conversational, friendly, and guide users through the process
+
+Respond in a conversational manner and help users create high-quality, well-structured GitHub issues.`;
+
 		// Send session configuration
 		const sessionConfig = {
 			type: 'session.update',
 			session: {
 				modalities: ['text', 'audio'],
-				instructions:
-					'You are a helpful AI assistant. Respond in a conversational and friendly manner.',
+				instructions,
 				voice: 'alloy',
 				input_audio_format: 'pcm16',
 				output_audio_format: 'pcm16',

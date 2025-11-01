@@ -4,7 +4,7 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"dev": "vite dev",
+		"dev": "vite dev --port 5252",
 		"build": "vite build",
 		"preview": "npm run build && wrangler dev",
 		"prepare": "svelte-kit sync || echo ''",
@@ -37,5 +37,10 @@
 		"vitest": "^3.2.4",
 		"vitest-browser-svelte": "^1.1.0",
 		"wrangler": "^4.45.2"
+	},
+	"dependencies": {
+		"@auth/core": "^0.41.1",
+		"@auth/sveltekit": "^1.11.1",
+		"@octokit/rest": "^22.0.1"
 	}
 }
