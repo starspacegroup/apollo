@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { marked } from 'marked';
-	import DOMPurify from 'dompurify';
-	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 
 	let { content = '' }: { content: string } = $props();
 	let renderedHTML = $state('');
@@ -14,20 +13,24 @@
 
 	// Update rendered HTML whenever content changes
 	$effect(() => {
-		if (content) {
-			// Parse markdown and sanitize HTML
+		if (content && browser) {
+			// Parse markdown
 			const parsed = marked.parse(content) as string;
-			renderedHTML = DOMPurify.sanitize(parsed, {
-				ALLOWED_TAGS: [
-					'p', 'br', 'strong', 'em', 'u', 'code', 'pre',
-					'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-					'ul', 'ol', 'li',
-					'blockquote',
-					'a', 'img',
-					'table', 'thead', 'tbody', 'tr', 'th', 'td',
-					'span', 'div'
-				],
-				ALLOWED_ATTR: ['href', 'target', 'rel', 'src', 'alt', 'class', 'title']
+			// Dynamically import DOMPurify only in the browser
+			import('dompurify').then((module) => {
+				const DOMPurify = module.default;
+				renderedHTML = DOMPurify.sanitize(parsed, {
+					ALLOWED_TAGS: [
+						'p', 'br', 'strong', 'em', 'u', 'code', 'pre',
+						'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+						'ul', 'ol', 'li',
+						'blockquote',
+						'a', 'img',
+						'table', 'thead', 'tbody', 'tr', 'th', 'td',
+						'span', 'div'
+					],
+					ALLOWED_ATTR: ['href', 'target', 'rel', 'src', 'alt', 'class', 'title']
+				});
 			});
 		}
 	});
