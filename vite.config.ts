@@ -1,9 +1,10 @@
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
 import { sveltekit } from '@sveltejs/kit/vite';
+import { voiceWebSocketPlugin } from './vite-plugin-voice-ws';
 
 export default defineConfig({
-	plugins: [tailwindcss(), sveltekit()],
+	plugins: [tailwindcss(), sveltekit(), voiceWebSocketPlugin()],
 	test: {
 		expect: { requireAssertions: true },
 		projects: [

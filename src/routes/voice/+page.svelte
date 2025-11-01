@@ -1,17 +1,23 @@
 <script lang="ts">
-	import VoiceChat from '$lib/VoiceChat.svelte';
+	import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
+
+	// Redirect to home page
+	onMount(() => {
+		goto('/');
+	});
 </script>
 
 <svelte:head>
-	<title>AI Voice Chat - Apollo</title>
+	<title>AI Chat - Apollo</title>
 	<meta
 		name="description"
-		content="Real-time voice chat with AI powered by OpenAI and Cloudflare"
+		content="Real-time text and voice chat with AI powered by OpenAI and Cloudflare"
 	/>
 </svelte:head>
 
 <div class="container">
-	<VoiceChat />
+	<p>Redirecting to home page...</p>
 </div>
 
 <style>

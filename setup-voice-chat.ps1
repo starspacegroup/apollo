@@ -37,7 +37,7 @@ Write-Host "✅ Successfully created .dev.vars file!" -ForegroundColor Green
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan
 Write-Host "1. Run: npm run dev" -ForegroundColor White
-Write-Host "2. Open: http://localhost:5173/voice" -ForegroundColor White
+Write-Host "2. Open: http://localhost:5173/chat" -ForegroundColor White
 Write-Host ""
 Write-Host "For production deployment:" -ForegroundColor Cyan
 Write-Host "Run: npx wrangler secret put OPENAI_API_KEY" -ForegroundColor White
