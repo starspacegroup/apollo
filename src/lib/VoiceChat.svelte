@@ -32,6 +32,8 @@
 	let nextPlaybackTime = 0;
 	let currentResponseId: string | null = null;
 	let processingResponse = false;
+	let currentAudioSource: AudioBufferSourceNode | null = null;
+	let shouldCancelAudio = false;
 	let textMessage = $state('');
 	let textInputRef = $state<HTMLTextAreaElement>();
 	let audioProcessor: ScriptProcessorNode | null = null;
@@ -131,12 +133,17 @@
 					case 'input_audio_buffer.speech_started':
 						console.log('Speech started - user is speaking');
 						// Cancel any ongoing response when user starts speaking in voice mode
-						if (processingResponse && ws && isVoiceMode) {
-							console.log('Canceling ongoing response for user interruption');
-							ws.send(JSON.stringify({ type: 'response.cancel' }));
+						if (isVoiceMode) {
+							// Always cancel audio playback when user starts speaking
 							cancelCurrentAudio();
-							processingResponse = false;
-							currentResponseId = null;
+							
+							// If there's an ongoing response, cancel it too
+							if (processingResponse && ws) {
+								console.log('Canceling ongoing response for user interruption');
+								ws.send(JSON.stringify({ type: 'response.cancel' }));
+								processingResponse = false;
+								currentResponseId = null;
+							}
 						}
 						break;
 
@@ -398,6 +405,21 @@
 	}
 
 	function cancelCurrentAudio() {
+		// Set flag to cancel audio playback loop
+		shouldCancelAudio = true;
+		
+		// Stop currently playing audio source
+		if (currentAudioSource) {
+			try {
+				currentAudioSource.stop();
+				currentAudioSource.disconnect();
+			} catch (e) {
+				// Audio source may already be stopped
+				console.log('Audio source already stopped');
+			}
+			currentAudioSource = null;
+		}
+		
 		// Clear the audio queue and stop playback
 		audioQueue = [];
 		isPlayingAudio = false;
@@ -426,41 +448,91 @@
 		if (!audioContext || isPlayingAudio || audioQueue.length === 0) return;
 
 		isPlayingAudio = true;
+		shouldCancelAudio = false;
 
-		while (audioQueue.length > 0) {
-			const audioData = audioQueue.shift()!;
-			const pcm16 = new Int16Array(audioData);
+		try {
+			while (audioQueue.length > 0 && !shouldCancelAudio) {
+				// Check cancellation before processing next chunk
+				if (shouldCancelAudio) {
+					console.log('Audio playback cancelled before next chunk');
+					break;
+				}
 
-			// Convert PCM16 to Float32
-			const float32 = new Float32Array(pcm16.length);
-			for (let i = 0; i < pcm16.length; i++) {
-				float32[i] = pcm16[i] / (pcm16[i] < 0 ? 0x8000 : 0x7fff);
+				const audioData = audioQueue.shift()!;
+				const pcm16 = new Int16Array(audioData);
+
+				// Convert PCM16 to Float32
+				const float32 = new Float32Array(pcm16.length);
+				for (let i = 0; i < pcm16.length; i++) {
+					float32[i] = pcm16[i] / (pcm16[i] < 0 ? 0x8000 : 0x7fff);
+				}
+
+				const audioBuffer = audioContext.createBuffer(1, float32.length, audioContext.sampleRate);
+				audioBuffer.getChannelData(0).set(float32);
+
+				const source = audioContext.createBufferSource();
+				source.buffer = audioBuffer;
+				source.connect(audioContext.destination);
+
+				// Store reference to current audio source
+				currentAudioSource = source;
+
+				// Calculate when to start this chunk (play immediately)
+				const currentTime = audioContext.currentTime;
+				const startTime = Math.max(currentTime, nextPlaybackTime);
+				
+				source.start(startTime);
+				
+				// Update next playback time to be after this chunk finishes
+				nextPlaybackTime = startTime + audioBuffer.duration;
+
+				// Wait for the chunk to finish with cancellation support
+				await new Promise<void>((resolve) => {
+					let resolved = false;
+					
+					source.onended = () => {
+						if (!resolved) {
+							resolved = true;
+							currentAudioSource = null;
+							resolve();
+						}
+					};
+					
+					// Check for cancellation periodically
+					const checkInterval = setInterval(() => {
+						if (shouldCancelAudio && !resolved) {
+							resolved = true;
+							clearInterval(checkInterval);
+							// Stop the source immediately
+							try {
+								source.stop();
+								source.disconnect();
+							} catch (e) {
+								// May already be stopped
+							}
+							currentAudioSource = null;
+							resolve();
+						}
+					}, 10); // Check every 10ms for responsive cancellation
+					
+					// Cleanup interval when audio ends naturally
+					source.addEventListener('ended', () => {
+						clearInterval(checkInterval);
+					});
+				});
+
+				// Check again after the chunk
+				if (shouldCancelAudio) {
+					console.log('Audio playback cancelled after chunk');
+					break;
+				}
 			}
-
-			const audioBuffer = audioContext.createBuffer(1, float32.length, audioContext.sampleRate);
-			audioBuffer.getChannelData(0).set(float32);
-
-			const source = audioContext.createBufferSource();
-			source.buffer = audioBuffer;
-			source.connect(audioContext.destination);
-
-			// Calculate when to start this chunk
-			const currentTime = audioContext.currentTime;
-			const startTime = Math.max(currentTime, nextPlaybackTime);
-			
-			source.start(startTime);
-			
-			// Update next playback time to be after this chunk finishes
-			nextPlaybackTime = startTime + audioBuffer.duration;
-
-			// Wait for the chunk to finish before processing the next one
-			await new Promise<void>((resolve) => {
-				source.onended = () => resolve();
-			});
+		} finally {
+			isPlayingAudio = false;
+			isSpeaking = false;
+			currentAudioSource = null;
+			console.log('Audio queue processing ended');
 		}
-
-		isPlayingAudio = false;
-		isSpeaking = false;
 	}
 
 	function base64Encode(buffer: ArrayBuffer): string {
