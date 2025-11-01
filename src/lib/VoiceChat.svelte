@@ -20,6 +20,7 @@
 	let isRecording = $state(false);
 	let isSpeaking = $state(false);
 	let isVoiceMode = $state(false); // Track if voice mode is active
+	let isConnecting = $state(false); // Track connecting state
 	let error = $state('');
 	let isLoadingRepo = $state(false);
 	let repoLoadStatus = $state('');
@@ -134,24 +135,34 @@
 						// With server_vad, this is handled automatically
 						break;
 
-					case 'conversation.item.created':
-						console.log('Item created:', data);
-						break;
-
-					case 'response.created':
-						// New response started
-						if (processingResponse && currentResponseId) {
-							console.warn('Response created while another is in progress!', {
-								existing: currentResponseId,
-								new: data.response?.id
-							});
+				case 'conversation.item.created':
+					console.log('Item created:', data);
+					// Add user message when conversation item is created (before response starts)
+					if (data.item?.role === 'user' && isVoiceMode) {
+						// For voice mode, we get the item created before transcription
+						// We'll update it later when transcription completes
+						const content = data.item?.content?.[0];
+						if (content?.type === 'input_audio') {
+							// Add placeholder for voice input
+							addTranscript('user', '...');
+						} else if (content?.type === 'input_text') {
+							addTranscript('user', content.text || '');
 						}
-						currentResponseId = data.response?.id || null;
-						processingResponse = true;
-						console.log('Response created:', currentResponseId);
-						break;
+					}
+					break;
 
-					case 'response.output_item.added':
+				case 'response.created':
+					// New response started
+					if (processingResponse && currentResponseId) {
+						console.warn('Response created while another is in progress!', {
+							existing: currentResponseId,
+							new: data.response?.id
+						});
+					}
+					currentResponseId = data.response?.id || null;
+					processingResponse = true;
+					console.log('Response created:', currentResponseId);
+					break;					case 'response.output_item.added':
 						// Output item added
 						console.log('Output item added:', data);
 						break;
@@ -182,14 +193,27 @@
 						}
 						break;
 
-					case 'conversation.item.input_audio_transcription.completed':
-						// User's speech transcription
-						if (data.transcript) {
+				case 'conversation.item.input_audio_transcription.completed':
+					// User's speech transcription - update the placeholder we added earlier
+					if (data.transcript) {
+						// Find the last user message with placeholder and update it
+						let lastUserIndex = -1;
+						for (let i = transcript.length - 1; i >= 0; i--) {
+							if (transcript[i].role === 'user' && transcript[i].text === '...') {
+								lastUserIndex = i;
+								break;
+							}
+						}
+						
+						if (lastUserIndex !== -1) {
+							transcript[lastUserIndex].text = data.transcript;
+							transcript = [...transcript];
+						} else {
+							// Fallback: add if not found
 							addTranscript('user', data.transcript);
 						}
-						break;
-
-					case 'response.done':
+					}
+					break;					case 'response.done':
 						// Response completely finished
 						console.log('Response done:', data.response?.id);
 						processingResponse = false;
@@ -269,6 +293,7 @@
 	async function startVoiceChat() {
 		try {
 			error = '';
+			isConnecting = true;
 
 			// Connect WebSocket if not already connected
 			await connectWebSocket();
@@ -284,10 +309,14 @@
 				isVoiceMode = true;
 				enableServerVAD();
 				startRecording();
+				
+				// Show bounce animation after connecting
+				isConnecting = false;
 			}
 		} catch (err) {
 			console.error('Error starting voice chat:', err);
 			error = err instanceof Error ? err.message : 'Failed to start voice chat';
+			isConnecting = false;
 		}
 	}
 
@@ -528,6 +557,7 @@
 		isPlayingAudio = false;
 		nextPlaybackTime = 0;
 		isSpeaking = false;
+		isConnecting = false;
 
 		// Disable server VAD for text chat mode
 		disableServerVAD();
@@ -656,25 +686,6 @@
 		
 		<div class="input-wrapper">
 			<div class="input-controls">
-				<button 
-					class="icon-btn voice-btn" 
-					class:active={isVoiceMode}
-					onclick={isVoiceMode ? stopVoiceChat : startVoiceChat}
-					title={isVoiceMode ? 'Stop voice chat' : 'Start voice chat'}
-				>
-					{#if isVoiceMode}
-						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-							<rect width="6" height="6" x="9" y="9" rx="1"></rect>
-						</svg>
-					{:else}
-						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-							<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
-							<path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-							<line x1="12" x2="12" y1="19" y2="22"></line>
-						</svg>
-					{/if}
-				</button>
-				
 				<textarea
 					bind:this={textInputRef}
 					bind:value={textMessage}
@@ -685,15 +696,34 @@
 				></textarea>
 				
 				<button 
-					class="icon-btn send-btn" 
-					onclick={sendTextMessage}
-					disabled={!textMessage.trim()}
-					title="Send message"
+					class="voice-btn" 
+					class:connecting={isConnecting}
+					class:recording={isVoiceMode && isRecording}
+					class:speaking={isSpeaking}
+					class:active={isVoiceMode}
+					onclick={isVoiceMode ? stopVoiceChat : startVoiceChat}
+					title={isVoiceMode ? 'Stop voice chat' : 'Start voice chat'}
 				>
-					<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<path d="M22 2L11 13"></path>
-						<path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
-					</svg>
+					<div class="waveform-icon">
+						{#if isVoiceMode}
+							<!-- Stop icon when active -->
+							<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+								<rect width="8" height="8" x="6" y="6" rx="1.5"></rect>
+							</svg>
+						{:else}
+							<!-- Custom 5-bar waveform icon -->
+							<svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+								<rect class="bar bar-1" x="3" y="8" width="2.5" height="8" rx="1.25" fill="currentColor"></rect>
+								<rect class="bar bar-2" x="7.5" y="5" width="2.5" height="14" rx="1.25" fill="currentColor"></rect>
+								<rect class="bar bar-3" x="12" y="3" width="2.5" height="18" rx="1.25" fill="currentColor"></rect>
+								<rect class="bar bar-4" x="16.5" y="5" width="2.5" height="14" rx="1.25" fill="currentColor"></rect>
+								<rect class="bar bar-5" x="21" y="8" width="2.5" height="8" rx="1.25" fill="currentColor"></rect>
+							</svg>
+						{/if}
+					</div>
+					{#if isVoiceMode && isRecording}
+						<div class="pulse-ring"></div>
+					{/if}
 				</button>
 			</div>
 		</div>
@@ -983,12 +1013,12 @@
 
 	.input-controls {
 		display: flex;
-		align-items: flex-end;
+		align-items: center;
 		gap: 0.75rem;
-		padding: 0.75rem;
+		padding: 0.75rem 0.75rem 0.75rem 1.25rem;
 		background: #111111;
 		border: 1px solid #333333;
-		border-radius: 1.5rem;
+		border-radius: 2rem;
 		transition: all 0.2s;
 	}
 
@@ -1008,7 +1038,7 @@
 		max-height: 200px;
 		min-height: 24px;
 		font-family: inherit;
-		padding: 0.5rem;
+		padding: 0.5rem 0;
 	}
 
 	.message-input:focus {
@@ -1019,54 +1049,257 @@
 		color: #666666;
 	}
 
-	.icon-btn {
+	/* Voice Button Styles */
+	.voice-btn {
+		position: relative;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 36px;
-		height: 36px;
+		width: 44px;
+		height: 44px;
 		border: none;
-		border-radius: 0.75rem;
-		background: transparent;
-		color: #a0a0a0;
+		border-radius: 50%;
+		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		color: white;
 		cursor: pointer;
-		transition: all 0.2s;
+		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 		flex-shrink: 0;
+		box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 	}
 
-	.icon-btn:hover {
-		background: #1a1a1a;
-		color: #e5e5e5;
+	.voice-btn:hover {
+		transform: scale(1.05);
+		box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+	}
+
+	.voice-btn:active {
+		transform: scale(0.95);
 	}
 
 	.voice-btn.active {
-		background: #ef4444;
-		color: white;
+		background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+		animation: pulse-scale 2s ease-in-out infinite;
 	}
 
 	.voice-btn.active:hover {
-		background: #dc2626;
+		box-shadow: 0 4px 12px rgba(239, 68, 68, 0.5);
 	}
 
-	.send-btn {
-		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-		color: white;
+	.voice-btn.recording {
+		animation: pulse-scale 1.5s ease-in-out infinite;
 	}
 
-	.send-btn:hover:not(:disabled) {
-		opacity: 0.9;
-		transform: scale(1.05);
+	.voice-btn.speaking {
+		animation: speaking-pulse 0.8s ease-in-out infinite;
 	}
 
-	.send-btn:disabled {
-		background: #1a1a1a;
-		color: #666666;
-		cursor: not-allowed;
-		opacity: 0.5;
+	.voice-btn.connecting {
+		animation: none;
 	}
 
-	.send-btn:disabled:hover {
-		transform: none;
+	.waveform-icon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 2;
+		position: relative;
+	}
+
+	/* Waveform bar animations */
+	.waveform-icon .bar {
+		transform-origin: center;
+		transition: all 0.3s ease;
+	}
+
+	/* Connecting state - sequential wave animation */
+	.voice-btn.connecting .bar {
+		animation: wave-connecting 1.2s ease-in-out infinite;
+	}
+
+	.voice-btn.connecting .bar-1 {
+		animation-delay: 0s;
+	}
+
+	.voice-btn.connecting .bar-2 {
+		animation-delay: 0.1s;
+	}
+
+	.voice-btn.connecting .bar-3 {
+		animation-delay: 0.2s;
+	}
+
+	.voice-btn.connecting .bar-4 {
+		animation-delay: 0.3s;
+	}
+
+	.voice-btn.connecting .bar-5 {
+		animation-delay: 0.4s;
+	}
+
+	/* Active state - all bars animate together */
+	.voice-btn.active:not(.connecting) .bar {
+		animation: wave-active 1s ease-in-out infinite;
+	}
+
+	.voice-btn.active:not(.connecting) .bar-1,
+	.voice-btn.active:not(.connecting) .bar-5 {
+		animation-delay: 0s;
+	}
+
+	.voice-btn.active:not(.connecting) .bar-2,
+	.voice-btn.active:not(.connecting) .bar-4 {
+		animation-delay: 0.1s;
+	}
+
+	.voice-btn.active:not(.connecting) .bar-3 {
+		animation-delay: 0.2s;
+	}
+
+	/* Recording state - more energetic animation */
+	.voice-btn.recording .bar {
+		animation: wave-recording 0.6s ease-in-out infinite;
+	}
+
+	.voice-btn.recording .bar-1 {
+		animation-delay: 0s;
+	}
+
+	.voice-btn.recording .bar-2 {
+		animation-delay: 0.05s;
+	}
+
+	.voice-btn.recording .bar-3 {
+		animation-delay: 0.1s;
+	}
+
+	.voice-btn.recording .bar-4 {
+		animation-delay: 0.15s;
+	}
+
+	.voice-btn.recording .bar-5 {
+		animation-delay: 0.2s;
+	}
+
+	/* Speaking state - reactive animation */
+	.voice-btn.speaking .bar {
+		animation: wave-speaking 0.4s ease-in-out infinite;
+	}
+
+	.voice-btn.speaking .bar-1,
+	.voice-btn.speaking .bar-5 {
+		animation-delay: 0s;
+	}
+
+	.voice-btn.speaking .bar-2,
+	.voice-btn.speaking .bar-4 {
+		animation-delay: 0.1s;
+	}
+
+	.voice-btn.speaking .bar-3 {
+		animation-delay: 0.05s;
+	}
+
+	/* Bounce effect when connection completes */
+	.voice-btn.active:not(.connecting) {
+		animation: bounce-in 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+	}
+
+	/* Pulse ring animation for recording state */
+	.pulse-ring {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		width: 100%;
+		height: 100%;
+		border-radius: 50%;
+		border: 2px solid rgba(255, 255, 255, 0.8);
+		animation: pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	}
+
+	@keyframes pulse-scale {
+		0%, 100% {
+			transform: scale(1);
+		}
+		50% {
+			transform: scale(1.08);
+		}
+	}
+
+	@keyframes speaking-pulse {
+		0%, 100% {
+			transform: scale(1);
+			box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+		}
+		50% {
+			transform: scale(1.12);
+			box-shadow: 0 4px 20px rgba(239, 68, 68, 0.6);
+		}
+	}
+
+	@keyframes pulse-ring {
+		0% {
+			transform: translate(-50%, -50%) scale(1);
+			opacity: 1;
+		}
+		100% {
+			transform: translate(-50%, -50%) scale(1.8);
+			opacity: 0;
+		}
+	}
+
+	/* Waveform bar animations */
+	@keyframes wave-connecting {
+		0%, 100% {
+			transform: scaleY(1);
+			opacity: 0.6;
+		}
+		50% {
+			transform: scaleY(0.4);
+			opacity: 1;
+		}
+	}
+
+	@keyframes wave-active {
+		0%, 100% {
+			transform: scaleY(1);
+		}
+		50% {
+			transform: scaleY(0.6);
+		}
+	}
+
+	@keyframes wave-recording {
+		0%, 100% {
+			transform: scaleY(1);
+		}
+		50% {
+			transform: scaleY(0.5);
+		}
+	}
+
+	@keyframes wave-speaking {
+		0%, 100% {
+			transform: scaleY(1);
+		}
+		25% {
+			transform: scaleY(0.4);
+		}
+		75% {
+			transform: scaleY(1.2);
+		}
+	}
+
+	@keyframes bounce-in {
+		0% {
+			transform: scale(1);
+		}
+		50% {
+			transform: scale(1.2);
+		}
+		100% {
+			transform: scale(1);
+		}
 	}
 
 	/* Animations */
