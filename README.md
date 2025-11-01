@@ -1,22 +1,31 @@
-# sv
+# Apollo SvelteKit App
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+A SvelteKit application with real-time AI voice chat, powered by Cloudflare
+Workers and OpenAI.
 
-## Creating a project
+## Features
 
-If you're seeing this, you've probably already done this step. Congrats!
+🎤 **AI Voice Chat** - Real-time voice conversation with AI using OpenAI's
+Realtime API ⚡ **Cloudflare Workers** - Serverless WebSocket proxy for optimal
+performance 🌐 **SvelteKit** - Modern full-stack framework with excellent DX
 
-```sh
-# create a new project in the current directory
-npx sv create
+## Quick Start
 
-# create a new project in my-app
-npx sv create my-app
-```
+### Voice Chat Setup
+
+1. **Get OpenAI API Key**: Visit
+   [OpenAI Platform](https://platform.openai.com/api-keys)
+2. **Run setup script**: `.\setup-voice-chat.ps1` (or manually create
+   `.dev.vars`)
+3. **Start dev server**: `npm run dev`
+4. **Open voice chat**: Navigate to `http://localhost:5173/voice`
+
+For detailed instructions, see [VOICE_CHAT_README.md](./VOICE_CHAT_README.md)
 
 ## Developing
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+Once you've created a project and installed dependencies with `npm install` (or
+`pnpm install` or `yarn`), start a development server:
 
 ```sh
 npm run dev
@@ -35,4 +44,5 @@ npm run build
 
 You can preview the production build with `npm run preview`.
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+> To deploy your app, you may need to install an
+> [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.

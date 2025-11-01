@@ -1,0 +1,6 @@
+# Local development environment variables
+# Copy this file to .dev.vars and fill in your actual values
+# NEVER commit .dev.vars to version control
+
+# OpenAI API Key for Realtime API access
+OPENAI_API_KEY=sk-your-openai-api-key-here
