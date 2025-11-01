@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import MarkdownRenderer from './MarkdownRenderer.svelte';
+	import { signOut } from '@auth/sveltekit/client';
 
 	// Accept repository as a prop
 	let { 
@@ -35,6 +36,7 @@
 	let textInputRef = $state<HTMLTextAreaElement>();
 	let audioProcessor: ScriptProcessorNode | null = null;
 	let messagesContainerRef = $state<HTMLDivElement>();
+	let showUserMenu = $state(false);
 
 	// Auto-scroll to bottom when transcript changes
 	$effect(() => {
@@ -50,6 +52,20 @@
 	// Auto-connect on mount
 	onMount(() => {
 		connectWebSocket();
+		
+		// Close user menu when clicking outside
+		const handleClickOutside = (e: MouseEvent) => {
+			const target = e.target as HTMLElement;
+			if (!target.closest('.user-menu-container')) {
+				showUserMenu = false;
+			}
+		};
+		
+		document.addEventListener('click', handleClickOutside);
+		
+		return () => {
+			document.removeEventListener('click', handleClickOutside);
+		};
 	});
 
 	async function connectWebSocket() {
@@ -632,11 +648,33 @@
 				</div>
 			{/if}
 			{#if session?.user}
-				<div class="user-pill">
-					{#if session.user.image}
-						<img src={session.user.image} alt={session.user.name || 'User'} class="user-avatar" />
+				<div class="user-menu-container">
+					<button 
+						class="user-pill" 
+						onclick={() => showUserMenu = !showUserMenu}
+						title="User menu"
+					>
+						{#if session.user.image}
+							<img src={session.user.image} alt={session.user.name || 'User'} class="user-avatar" />
+						{/if}
+						<span>{session.user.name || session.user.username}</span>
+						<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron" class:open={showUserMenu}>
+							<polyline points="6 9 12 15 18 9"></polyline>
+						</svg>
+					</button>
+					
+					{#if showUserMenu}
+						<div class="user-dropdown">
+							<button onclick={() => { signOut(); showUserMenu = false; }} class="dropdown-item logout">
+								<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+									<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+									<polyline points="16 17 21 12 16 7"></polyline>
+									<line x1="21" y1="12" x2="9" y2="12"></line>
+								</svg>
+								<span>Sign out</span>
+							</button>
+						</div>
 					{/if}
-					<span>{session.user.name || session.user.username}</span>
 				</div>
 			{/if}
 		</div>
@@ -839,6 +877,10 @@
 		to { transform: rotate(360deg); }
 	}
 
+	.user-menu-container {
+		position: relative;
+	}
+
 	.user-pill {
 		display: flex;
 		align-items: center;
@@ -848,12 +890,81 @@
 		border: 1px solid #333333;
 		border-radius: 1rem;
 		font-size: 0.875rem;
+		cursor: pointer;
+		transition: all 0.2s;
+		color: #e5e5e5;
+	}
+
+	.user-pill:hover {
+		background: #222222;
+		border-color: #444444;
+	}
+
+	.user-pill .chevron {
+		transition: transform 0.2s;
+		color: #a0a0a0;
+	}
+
+	.user-pill .chevron.open {
+		transform: rotate(180deg);
 	}
 
 	.user-avatar {
 		width: 24px;
 		height: 24px;
 		border-radius: 50%;
+	}
+
+	.user-dropdown {
+		position: absolute;
+		top: calc(100% + 0.5rem);
+		right: 0;
+		min-width: 160px;
+		background: #1a1a1a;
+		border: 1px solid #333333;
+		border-radius: 0.5rem;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+		overflow: hidden;
+		z-index: 1000;
+		animation: dropdownSlide 0.2s ease-out;
+	}
+
+	@keyframes dropdownSlide {
+		from {
+			opacity: 0;
+			transform: translateY(-8px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
+	.dropdown-item {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		width: 100%;
+		padding: 0.75rem 1rem;
+		background: transparent;
+		border: none;
+		color: #e5e5e5;
+		font-size: 0.875rem;
+		cursor: pointer;
+		transition: all 0.2s;
+		text-align: left;
+	}
+
+	.dropdown-item:hover {
+		background: #222222;
+	}
+
+	.dropdown-item.logout:hover {
+		color: #ef4444;
+	}
+
+	.dropdown-item svg {
+		flex-shrink: 0;
 	}
 
 	/* Chat Area */
