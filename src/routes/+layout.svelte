@@ -5,7 +5,7 @@
 	import type { LayoutData } from './$types';
 
 	let { children, data }: { children: any; data: LayoutData } = $props();
-	
+
 	const session = $derived(data.session);
 </script>
 

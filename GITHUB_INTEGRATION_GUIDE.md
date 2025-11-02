@@ -133,6 +133,7 @@ Apollo helps you create high-quality issues by:
    - Who is affected?
 
 2. **Formatting as User Stories** (when appropriate)
+
    ```
    As a [user type]
    I want [goal]

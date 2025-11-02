@@ -31,4 +31,4 @@ declare module '$env/static/private' {
 	export const AUTH_SECRET: string;
 }
 
-export { };
+export {};

@@ -47,6 +47,7 @@ When users want to create issues, follow these best practices:
    - What priority/labels should be applied?
 
 2. **Format as User Stories** (when appropriate):
+
    ```
    As a [type of user]
    I want [some goal]
