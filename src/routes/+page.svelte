@@ -3,7 +3,7 @@
 	import RepoSelector from '$lib/RepoSelector.svelte';
 	import VoiceChat from '$lib/VoiceChat.svelte';
 	import { repoStore } from '$lib/stores/repoStore';
-	
+
 	let { data }: { data: PageData } = $props();
 	const session = $derived(data.session);
 	let repoSelector: any;
@@ -33,6 +33,7 @@
 	.app-container {
 		width: 100vw;
 		height: 100vh;
+		height: 100dvh; /* Use dynamic viewport height for mobile */
 		overflow: hidden;
 	}
 </style>

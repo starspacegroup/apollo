@@ -4,12 +4,12 @@
 	import { signIn, signOut } from '@auth/sveltekit/client';
 
 	// Accept repository as a prop
-	let { 
-		repository = '', 
+	let {
+		repository = '',
 		session = null,
 		changeRepo = () => {}
-	}: { 
-		repository?: string; 
+	}: {
+		repository?: string;
 		session?: any;
 		changeRepo?: () => void;
 	} = $props();
@@ -54,7 +54,7 @@
 	// Auto-connect on mount
 	onMount(() => {
 		connectWebSocket();
-		
+
 		// Close user menu when clicking outside
 		const handleClickOutside = (e: MouseEvent) => {
 			const target = e.target as HTMLElement;
@@ -62,9 +62,9 @@
 				showUserMenu = false;
 			}
 		};
-		
+
 		document.addEventListener('click', handleClickOutside);
-		
+
 		return () => {
 			document.removeEventListener('click', handleClickOutside);
 		};
@@ -136,7 +136,7 @@
 						if (isVoiceMode) {
 							// Always cancel audio playback when user starts speaking
 							cancelCurrentAudio();
-							
+
 							// If there's an ongoing response, cancel it too
 							if (processingResponse && ws) {
 								console.log('Canceling ongoing response for user interruption');
@@ -158,32 +158,33 @@
 						// With server_vad, this is handled automatically
 						break;
 
-				case 'conversation.item.created':
-					console.log('Item created:', data);
-					// Add user message when conversation item is created (before response starts)
-					if (data.item?.role === 'user') {
-						const content = data.item?.content?.[0];
-						// Only add transcript for audio input in voice mode
-						// Text messages are already added in sendTextMessage()
-						if (content?.type === 'input_audio' && isVoiceMode) {
-							// Add placeholder for voice input
-							addTranscript('user', '...');
+					case 'conversation.item.created':
+						console.log('Item created:', data);
+						// Add user message when conversation item is created (before response starts)
+						if (data.item?.role === 'user') {
+							const content = data.item?.content?.[0];
+							// Only add transcript for audio input in voice mode
+							// Text messages are already added in sendTextMessage()
+							if (content?.type === 'input_audio' && isVoiceMode) {
+								// Add placeholder for voice input
+								addTranscript('user', '...');
+							}
 						}
-					}
-					break;
+						break;
 
-				case 'response.created':
-					// New response started
-					if (processingResponse && currentResponseId) {
-						console.warn('Response created while another is in progress!', {
-							existing: currentResponseId,
-							new: data.response?.id
-						});
-					}
-					currentResponseId = data.response?.id || null;
-					processingResponse = true;
-					console.log('Response created:', currentResponseId);
-					break;					case 'response.output_item.added':
+					case 'response.created':
+						// New response started
+						if (processingResponse && currentResponseId) {
+							console.warn('Response created while another is in progress!', {
+								existing: currentResponseId,
+								new: data.response?.id
+							});
+						}
+						currentResponseId = data.response?.id || null;
+						processingResponse = true;
+						console.log('Response created:', currentResponseId);
+						break;
+					case 'response.output_item.added':
 						// Output item added
 						console.log('Output item added:', data);
 						break;
@@ -195,7 +196,12 @@
 
 					case 'response.audio.delta':
 						// Play audio response only if it matches current response and we're in voice mode
-						if (data.response_id === currentResponseId && data.delta && audioContext && isVoiceMode) {
+						if (
+							data.response_id === currentResponseId &&
+							data.delta &&
+							audioContext &&
+							isVoiceMode
+						) {
 							await playAudio(data.delta);
 						}
 						break;
@@ -214,27 +220,28 @@
 						}
 						break;
 
-				case 'conversation.item.input_audio_transcription.completed':
-					// User's speech transcription - update the placeholder we added earlier
-					if (data.transcript) {
-						// Find the last user message with placeholder and update it
-						let lastUserIndex = -1;
-						for (let i = transcript.length - 1; i >= 0; i--) {
-							if (transcript[i].role === 'user' && transcript[i].text === '...') {
-								lastUserIndex = i;
-								break;
+					case 'conversation.item.input_audio_transcription.completed':
+						// User's speech transcription - update the placeholder we added earlier
+						if (data.transcript) {
+							// Find the last user message with placeholder and update it
+							let lastUserIndex = -1;
+							for (let i = transcript.length - 1; i >= 0; i--) {
+								if (transcript[i].role === 'user' && transcript[i].text === '...') {
+									lastUserIndex = i;
+									break;
+								}
+							}
+
+							if (lastUserIndex !== -1) {
+								transcript[lastUserIndex].text = data.transcript;
+								transcript = [...transcript];
+							} else {
+								// Fallback: add if not found
+								addTranscript('user', data.transcript);
 							}
 						}
-						
-						if (lastUserIndex !== -1) {
-							transcript[lastUserIndex].text = data.transcript;
-							transcript = [...transcript];
-						} else {
-							// Fallback: add if not found
-							addTranscript('user', data.transcript);
-						}
-					}
-					break;					case 'response.done':
+						break;
+					case 'response.done':
 						// Response completely finished
 						console.log('Response done:', data.response?.id);
 						processingResponse = false;
@@ -282,33 +289,37 @@
 
 	function disableServerVAD() {
 		if (!ws || ws.readyState !== WebSocket.OPEN) return;
-		
+
 		// Disable server-side voice activity detection for text mode
 		console.log('Disabling server VAD for text mode');
-		ws.send(JSON.stringify({
-			type: 'session.update',
-			session: {
-				turn_detection: null
-			}
-		}));
+		ws.send(
+			JSON.stringify({
+				type: 'session.update',
+				session: {
+					turn_detection: null
+				}
+			})
+		);
 	}
 
 	function enableServerVAD() {
 		if (!ws || ws.readyState !== WebSocket.OPEN) return;
-		
+
 		// Enable server-side voice activity detection for voice mode
 		console.log('Enabling server VAD for voice mode');
-		ws.send(JSON.stringify({
-			type: 'session.update',
-			session: {
-				turn_detection: {
-					type: 'server_vad',
-					threshold: 0.6,
-					prefix_padding_ms: 300,
-					silence_duration_ms: 800
+		ws.send(
+			JSON.stringify({
+				type: 'session.update',
+				session: {
+					turn_detection: {
+						type: 'server_vad',
+						threshold: 0.6,
+						prefix_padding_ms: 300,
+						silence_duration_ms: 800
+					}
 				}
-			}
-		}));
+			})
+		);
 	}
 
 	async function startVoiceChat() {
@@ -330,7 +341,7 @@
 				isVoiceMode = true;
 				enableServerVAD();
 				startRecording();
-				
+
 				// Show bounce animation after connecting
 				isConnecting = false;
 			}
@@ -407,7 +418,7 @@
 	function cancelCurrentAudio() {
 		// Set flag to cancel audio playback loop
 		shouldCancelAudio = true;
-		
+
 		// Stop currently playing audio source
 		if (currentAudioSource) {
 			try {
@@ -419,7 +430,7 @@
 			}
 			currentAudioSource = null;
 		}
-		
+
 		// Clear the audio queue and stop playback
 		audioQueue = [];
 		isPlayingAudio = false;
@@ -435,7 +446,7 @@
 			isSpeaking = true;
 			const audioData = base64Decode(base64Audio);
 			audioQueue.push(audioData);
-			
+
 			if (!isPlayingAudio) {
 				processAudioQueue();
 			}
@@ -480,16 +491,16 @@
 				// Calculate when to start this chunk (play immediately)
 				const currentTime = audioContext.currentTime;
 				const startTime = Math.max(currentTime, nextPlaybackTime);
-				
+
 				source.start(startTime);
-				
+
 				// Update next playback time to be after this chunk finishes
 				nextPlaybackTime = startTime + audioBuffer.duration;
 
 				// Wait for the chunk to finish with cancellation support
 				await new Promise<void>((resolve) => {
 					let resolved = false;
-					
+
 					source.onended = () => {
 						if (!resolved) {
 							resolved = true;
@@ -497,7 +508,7 @@
 							resolve();
 						}
 					};
-					
+
 					// Check for cancellation periodically
 					const checkInterval = setInterval(() => {
 						if (shouldCancelAudio && !resolved) {
@@ -514,7 +525,7 @@
 							resolve();
 						}
 					}, 10); // Check every 10ms for responsive cancellation
-					
+
 					// Cleanup interval when audio ends naturally
 					source.addEventListener('ended', () => {
 						clearInterval(checkInterval);
@@ -576,7 +587,7 @@
 		if (!ws || ws.readyState !== WebSocket.OPEN) {
 			await connectWebSocket();
 			// Wait a bit for connection to establish
-			await new Promise(resolve => setTimeout(resolve, 500));
+			await new Promise((resolve) => setTimeout(resolve, 500));
 		}
 
 		if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -595,7 +606,7 @@
 			processingResponse = false;
 			currentResponseId = null;
 			// Wait longer for cancellation to be acknowledged
-			await new Promise(resolve => setTimeout(resolve, 300));
+			await new Promise((resolve) => setTimeout(resolve, 300));
 		}
 
 		// Check again to ensure no response is in progress
@@ -621,7 +632,7 @@
 		};
 
 		ws.send(JSON.stringify(textEvent));
-		
+
 		// Request response from AI (explicit for text messages)
 		console.log('Requesting AI response for text message');
 		ws.send(JSON.stringify({ type: 'response.create' }));
@@ -683,14 +694,23 @@
 			<h1 class="logo">Apollo</h1>
 			{#if session?.user && repository}
 				<button onclick={changeRepo} class="repo-badge" title="Change repository">
-					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="16"
+						height="16"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+						></path>
 					</svg>
 					<span>{repository}</span>
 				</button>
 			{/if}
 		</div>
-		
+
 		<div class="nav-right">
 			{#if isLoadingRepo}
 				<div class="status-pill loading">
@@ -699,7 +719,15 @@
 				</div>
 			{:else if repoLoadStatus}
 				<div class="status-pill success">
-					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="16"
+						height="16"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
 						<polyline points="20 6 9 17 4 12"></polyline>
 					</svg>
 					<span>{repoLoadStatus}</span>
@@ -719,24 +747,50 @@
 			{/if}
 			{#if session?.user}
 				<div class="user-menu-container">
-					<button 
-						class="user-pill" 
-						onclick={() => showUserMenu = !showUserMenu}
+					<button
+						class="user-pill"
+						onclick={() => (showUserMenu = !showUserMenu)}
 						title="User menu"
 					>
 						{#if session.user.image}
 							<img src={session.user.image} alt={session.user.name || 'User'} class="user-avatar" />
 						{/if}
 						<span>{session.user.name || session.user.username}</span>
-						<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron" class:open={showUserMenu}>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="14"
+							height="14"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							class="chevron"
+							class:open={showUserMenu}
+						>
 							<polyline points="6 9 12 15 18 9"></polyline>
 						</svg>
 					</button>
-					
+
 					{#if showUserMenu}
 						<div class="user-dropdown">
-							<button onclick={() => { signOut(); showUserMenu = false; }} class="dropdown-item logout">
-								<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<button
+								onclick={() => {
+									signOut();
+									showUserMenu = false;
+								}}
+								class="dropdown-item logout"
+							>
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									width="16"
+									height="16"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
 									<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
 									<polyline points="16 17 21 12 16 7"></polyline>
 									<line x1="21" y1="12" x2="9" y2="12"></line>
@@ -748,8 +802,16 @@
 				</div>
 			{:else}
 				<button onclick={() => signIn('github')} class="login-btn" title="Sign in with GitHub">
-					<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-						<path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="18"
+						height="18"
+						viewBox="0 0 24 24"
+						fill="currentColor"
+					>
+						<path
+							d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+						/>
 					</svg>
 					<span>Sign in with GitHub</span>
 				</button>
@@ -763,7 +825,15 @@
 			{#if transcript.length === 0}
 				<div class="welcome-state">
 					<div class="welcome-icon">
-						<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="64"
+							height="64"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.5"
+						>
 							<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
 						</svg>
 					</div>
@@ -790,7 +860,15 @@
 	<div class="input-area">
 		{#if error}
 			<div class="error-banner">
-				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					width="16"
+					height="16"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
 					<circle cx="12" cy="12" r="10"></circle>
 					<line x1="12" y1="8" x2="12" y2="12"></line>
 					<line x1="12" y1="16" x2="12.01" y2="16"></line>
@@ -798,7 +876,7 @@
 				{error}
 			</div>
 		{/if}
-		
+
 		<div class="input-wrapper">
 			<div class="input-controls">
 				<textarea
@@ -809,21 +887,31 @@
 					rows="1"
 					class="message-input"
 				></textarea>
-				
-				<button 
-					class="send-btn" 
+
+				<button
+					class="send-btn"
 					onclick={sendTextMessage}
 					disabled={!textMessage.trim()}
 					title="Send message"
 				>
-					<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
 						<line x1="22" y1="2" x2="11" y2="13"></line>
 						<polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
 					</svg>
 				</button>
-				
-				<button 
-					class="voice-btn" 
+
+				<button
+					class="voice-btn"
 					class:connecting={isConnecting}
 					class:recording={isVoiceMode && isRecording}
 					class:speaking={isSpeaking}
@@ -840,11 +928,51 @@
 						{:else}
 							<!-- Custom 5-bar waveform icon -->
 							<svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-								<rect class="bar bar-1" x="3" y="8" width="2.5" height="8" rx="1.25" fill="currentColor"></rect>
-								<rect class="bar bar-2" x="7.5" y="5" width="2.5" height="14" rx="1.25" fill="currentColor"></rect>
-								<rect class="bar bar-3" x="12" y="3" width="2.5" height="18" rx="1.25" fill="currentColor"></rect>
-								<rect class="bar bar-4" x="16.5" y="5" width="2.5" height="14" rx="1.25" fill="currentColor"></rect>
-								<rect class="bar bar-5" x="21" y="8" width="2.5" height="8" rx="1.25" fill="currentColor"></rect>
+								<rect
+									class="bar bar-1"
+									x="3"
+									y="8"
+									width="2.5"
+									height="8"
+									rx="1.25"
+									fill="currentColor"
+								></rect>
+								<rect
+									class="bar bar-2"
+									x="7.5"
+									y="5"
+									width="2.5"
+									height="14"
+									rx="1.25"
+									fill="currentColor"
+								></rect>
+								<rect
+									class="bar bar-3"
+									x="12"
+									y="3"
+									width="2.5"
+									height="18"
+									rx="1.25"
+									fill="currentColor"
+								></rect>
+								<rect
+									class="bar bar-4"
+									x="16.5"
+									y="5"
+									width="2.5"
+									height="14"
+									rx="1.25"
+									fill="currentColor"
+								></rect>
+								<rect
+									class="bar bar-5"
+									x="21"
+									y="8"
+									width="2.5"
+									height="8"
+									rx="1.25"
+									fill="currentColor"
+								></rect>
 							</svg>
 						{/if}
 					</div>
@@ -862,10 +990,12 @@
 		display: flex;
 		flex-direction: column;
 		height: 100vh;
+		height: 100dvh; /* Use dynamic viewport height for mobile */
 		width: 100%;
 		background: #0a0a0a;
 		color: #e5e5e5;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+		font-family:
+			-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
 	}
 
 	/* Top Navigation */
@@ -963,7 +1093,9 @@
 	}
 
 	@keyframes spin {
-		to { transform: rotate(360deg); }
+		to {
+			transform: rotate(360deg);
+		}
 	}
 
 	.user-menu-container {
@@ -1474,7 +1606,8 @@
 	}
 
 	@keyframes pulse-scale {
-		0%, 100% {
+		0%,
+		100% {
 			transform: scale(1);
 		}
 		50% {
@@ -1483,7 +1616,8 @@
 	}
 
 	@keyframes speaking-pulse {
-		0%, 100% {
+		0%,
+		100% {
 			transform: scale(1);
 			box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
 		}
@@ -1506,7 +1640,8 @@
 
 	/* Waveform bar animations */
 	@keyframes wave-connecting {
-		0%, 100% {
+		0%,
+		100% {
 			transform: scaleY(1);
 			opacity: 0.6;
 		}
@@ -1517,7 +1652,8 @@
 	}
 
 	@keyframes wave-active {
-		0%, 100% {
+		0%,
+		100% {
 			transform: scaleY(1);
 		}
 		50% {
@@ -1526,7 +1662,8 @@
 	}
 
 	@keyframes wave-recording {
-		0%, 100% {
+		0%,
+		100% {
 			transform: scaleY(1);
 		}
 		50% {
@@ -1535,7 +1672,8 @@
 	}
 
 	@keyframes wave-speaking {
-		0%, 100% {
+		0%,
+		100% {
 			transform: scaleY(1);
 		}
 		25% {
@@ -1568,7 +1706,8 @@
 	}
 
 	@keyframes pulse-animation {
-		0%, 100% {
+		0%,
+		100% {
 			opacity: 1;
 			transform: scale(1);
 		}
@@ -1587,7 +1726,8 @@
 	}
 
 	@keyframes wave-animation {
-		0%, 100% {
+		0%,
+		100% {
 			transform: scaleY(1);
 		}
 		50% {
@@ -1611,5 +1751,141 @@
 
 	.messages-container::-webkit-scrollbar-thumb:hover {
 		background: #444444;
+	}
+
+	/* Mobile optimizations */
+	@media (max-width: 768px) {
+		.top-nav {
+			padding: 0.5rem 1rem;
+			height: 56px;
+		}
+
+		.nav-left {
+			gap: 0.5rem;
+		}
+
+		.logo {
+			font-size: 1.125rem;
+		}
+
+		.repo-badge {
+			padding: 0.375rem 0.5rem;
+			font-size: 0.8125rem;
+		}
+
+		.repo-badge span {
+			max-width: 120px;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		.status-pill {
+			padding: 0.375rem 0.625rem;
+			font-size: 0.8125rem;
+		}
+
+		.user-pill {
+			padding: 0.25rem 0.625rem 0.25rem 0.25rem;
+			font-size: 0.8125rem;
+		}
+
+		.user-avatar {
+			width: 20px;
+			height: 20px;
+		}
+
+		.input-area {
+			padding: 1rem;
+		}
+
+		.messages-list {
+			padding: 1.5rem 0.75rem;
+		}
+
+		.message-bubble {
+			max-width: 85%;
+			font-size: 0.875rem;
+			padding: 0.875rem 1rem;
+		}
+
+		.message-wrapper.system .message-bubble {
+			max-width: 70%;
+			font-size: 0.8125rem;
+		}
+
+		.welcome-state {
+			padding: 1.5rem;
+		}
+
+		.welcome-state h2 {
+			font-size: 1.5rem;
+		}
+
+		.welcome-state p {
+			font-size: 0.9375rem;
+		}
+
+		.input-controls {
+			padding: 0.625rem 0.625rem 0.625rem 1rem;
+		}
+
+		.message-input {
+			font-size: 0.875rem;
+		}
+
+		.voice-btn {
+			width: 40px;
+			height: 40px;
+		}
+
+		.send-btn {
+			width: 32px;
+			height: 32px;
+		}
+	}
+
+	/* Touch device optimizations */
+	@media (hover: none) and (pointer: coarse) {
+		/* Improve touch targets */
+		.voice-btn,
+		.send-btn,
+		.repo-badge,
+		.user-pill {
+			min-height: 44px; /* iOS minimum touch target */
+		}
+
+		/* Smooth scrolling on touch devices */
+		.messages-container {
+			-webkit-overflow-scrolling: touch;
+			overscroll-behavior: contain;
+		}
+
+		/* Prevent text selection during interactions */
+		.voice-btn,
+		.send-btn {
+			-webkit-tap-highlight-color: transparent;
+			-webkit-touch-callout: none;
+			user-select: none;
+		}
+	}
+
+	/* Small mobile devices */
+	@media (max-width: 375px) {
+		.nav-right {
+			gap: 0.5rem;
+		}
+
+		.repo-badge span {
+			max-width: 80px;
+		}
+
+		.user-pill span {
+			display: none;
+		}
+
+		.status-pill span {
+			font-size: 0.75rem;
+		}
 	}
 </style>
