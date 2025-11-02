@@ -9,6 +9,7 @@
    - Copy your Client ID and Client Secret
 
 2. **Update `.env` file**
+
    ```bash
    GITHUB_CLIENT_ID=paste_your_client_id
    GITHUB_CLIENT_SECRET=paste_your_secret
@@ -16,11 +17,13 @@
    ```
 
 3. **Generate AUTH_SECRET** (Windows PowerShell):
+
    ```powershell
    [Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Minimum 0 -Maximum 256 }))
    ```
 
 4. **Start the dev server**:
+
    ```bash
    npm run dev
    ```

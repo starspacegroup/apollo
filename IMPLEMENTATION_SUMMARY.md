@@ -154,7 +154,7 @@ case 'create_issue':
 
 ```typescript
 case 'github.issue_created':
-  addTranscript('system', 
+  addTranscript('system',
     `✅ Created issue #${data.issue.number}: ${data.issue.title}`
   );
   break;
@@ -174,6 +174,7 @@ case 'github.issue_created':
 To test the implementation:
 
 1. **Start the app:**
+
    ```powershell
    npm run dev
    ```

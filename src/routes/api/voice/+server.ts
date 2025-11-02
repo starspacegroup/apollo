@@ -22,7 +22,12 @@ const GITHUB_ASSISTANT_SYSTEM_PROMPT = `You are Apollo, an AI assistant for GitH
 
 Important: When users ask you to perform GitHub operations (create issues, search code, etc.), you should naturally guide them through the process in conversation. The actual API calls will be made through the application interface based on user confirmation.`;
 
-async function setupOpenAIConnection(clientWs: any, OPENAI_API_KEY: string, repository?: string, accessToken?: string) {
+async function setupOpenAIConnection(
+	clientWs: any,
+	OPENAI_API_KEY: string,
+	repository?: string,
+	accessToken?: string
+) {
 	// Connect to OpenAI Realtime API
 	const url = new URL('wss://api.openai.com/v1/realtime');
 	url.searchParams.set('model', 'gpt-4o-mini-realtime-preview');
@@ -86,10 +91,12 @@ async function setupOpenAIConnection(clientWs: any, OPENAI_API_KEY: string, repo
 						);
 						// Notify client that issue was created
 						if (clientWs.readyState === WebSocket.OPEN) {
-							clientWs.send(JSON.stringify({
-								type: 'github.issue_created',
-								issue: result
-							}));
+							clientWs.send(
+								JSON.stringify({
+									type: 'github.issue_created',
+									issue: result
+								})
+							);
 						}
 						break;
 
@@ -104,13 +111,7 @@ async function setupOpenAIConnection(clientWs: any, OPENAI_API_KEY: string, repo
 						break;
 
 					case 'add_issue_comment':
-						await addIssueComment(
-							accessToken,
-							owner,
-							repo,
-							args.issue_number,
-							args.comment
-						);
+						await addIssueComment(accessToken, owner, repo, args.issue_number, args.comment);
 						result = { success: true, message: 'Comment added successfully' };
 						break;
 
@@ -132,7 +133,6 @@ async function setupOpenAIConnection(clientWs: any, OPENAI_API_KEY: string, repo
 
 				// Trigger response generation
 				openaiWs.send(JSON.stringify({ type: 'response.create' }));
-
 			} catch (error) {
 				console.error('Tool call error:', error);
 				const errorOutput = {
@@ -163,13 +163,14 @@ async function setupOpenAIConnection(clientWs: any, OPENAI_API_KEY: string, repo
 		let repoContext = '';
 		if (repository) {
 			repoContext = `You are currently working with the GitHub repository: ${repository}\n\n`;
-			repoContext += 'You can help users plan and structure their GitHub issues, search code, and manage the repository.\n\n';
+			repoContext +=
+				'You can help users plan and structure their GitHub issues, search code, and manage the repository.\n\n';
 		} else {
-			repoContext = 'No repository is currently selected. You can still help users plan and structure their GitHub issues.\n\n';
+			repoContext =
+				'No repository is currently selected. You can still help users plan and structure their GitHub issues.\n\n';
 		}
 
-		const instructions = GITHUB_ASSISTANT_SYSTEM_PROMPT
-			.replace('{{REPO_CONTEXT}}', repoContext)
+		const instructions = GITHUB_ASSISTANT_SYSTEM_PROMPT.replace('{{REPO_CONTEXT}}', repoContext)
 			.replace('{{ASSISTANT_INSTRUCTIONS}}', githubAssistantInstructions)
 			.replace('{{LEGACY_CONTEXT}}', githubIssueContext);
 
@@ -178,7 +179,8 @@ async function setupOpenAIConnection(clientWs: any, OPENAI_API_KEY: string, repo
 			{
 				type: 'function',
 				name: 'get_repository_summary',
-				description: 'Get comprehensive information about the current GitHub repository including stats, README, and metadata',
+				description:
+					'Get comprehensive information about the current GitHub repository including stats, README, and metadata',
 				parameters: {
 					type: 'object',
 					properties: {},

@@ -1835,13 +1835,13 @@
 		}
 
 		.voice-btn {
-			width: 40px;
-			height: 40px;
+			width: 44px;
+			height: 44px;
 		}
 
 		.send-btn {
-			width: 32px;
-			height: 32px;
+			width: 36px;
+			height: 36px;
 		}
 	}
 
@@ -1853,6 +1853,7 @@
 		.repo-badge,
 		.user-pill {
 			min-height: 44px; /* iOS minimum touch target */
+			min-width: 44px;
 		}
 
 		/* Smooth scrolling on touch devices */

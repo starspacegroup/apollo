@@ -9,7 +9,7 @@
 	// Configure marked for better rendering
 	marked.setOptions({
 		breaks: true, // Enable line breaks
-		gfm: true, // GitHub Flavored Markdown
+		gfm: true // GitHub Flavored Markdown
 	});
 
 	// Update rendered HTML whenever content changes
@@ -19,13 +19,33 @@
 			const parsed = marked.parse(content) as string;
 			renderedHTML = DOMPurify.sanitize(parsed, {
 				ALLOWED_TAGS: [
-					'p', 'br', 'strong', 'em', 'u', 'code', 'pre',
-					'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-					'ul', 'ol', 'li',
+					'p',
+					'br',
+					'strong',
+					'em',
+					'u',
+					'code',
+					'pre',
+					'h1',
+					'h2',
+					'h3',
+					'h4',
+					'h5',
+					'h6',
+					'ul',
+					'ol',
+					'li',
 					'blockquote',
-					'a', 'img',
-					'table', 'thead', 'tbody', 'tr', 'th', 'td',
-					'span', 'div'
+					'a',
+					'img',
+					'table',
+					'thead',
+					'tbody',
+					'tr',
+					'th',
+					'td',
+					'span',
+					'div'
 				],
 				ALLOWED_ATTR: ['href', 'target', 'rel', 'src', 'alt', 'class', 'title']
 			});
@@ -88,10 +108,18 @@
 		line-height: 1.3;
 	}
 
-	.markdown-content :global(h1) { font-size: 1.75em; }
-	.markdown-content :global(h2) { font-size: 1.5em; }
-	.markdown-content :global(h3) { font-size: 1.25em; }
-	.markdown-content :global(h4) { font-size: 1.1em; }
+	.markdown-content :global(h1) {
+		font-size: 1.75em;
+	}
+	.markdown-content :global(h2) {
+		font-size: 1.5em;
+	}
+	.markdown-content :global(h3) {
+		font-size: 1.25em;
+	}
+	.markdown-content :global(h4) {
+		font-size: 1.1em;
+	}
 
 	.markdown-content :global(ul),
 	.markdown-content :global(ol) {

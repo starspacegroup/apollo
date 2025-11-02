@@ -69,9 +69,9 @@ Update `wrangler.jsonc` with your production callback URL:
 
 ```jsonc
 {
-  "vars": {
-    "ORIGIN": "https://your-production-domain.com"
-  }
+	"vars": {
+		"ORIGIN": "https://your-production-domain.com"
+	}
 }
 ```
 
@@ -107,18 +107,18 @@ user info in the navigation. To enforce authentication on specific routes, you
 can add this to any `+page.server.ts`:
 
 ```typescript
-import { redirect } from "@sveltejs/kit";
+import { redirect } from '@sveltejs/kit';
 
 export const load = async (event: any) => {
-  const session = await event.locals.auth();
+	const session = await event.locals.auth();
 
-  if (!session?.user) {
-    throw redirect(303, "/"); // Redirect to home if not authenticated
-  }
+	if (!session?.user) {
+		throw redirect(303, '/'); // Redirect to home if not authenticated
+	}
 
-  return {
-    session,
-  };
+	return {
+		session
+	};
 };
 ```
 
@@ -140,15 +140,15 @@ Access the session in any component:
 
 ```svelte
 <script lang="ts">
-  let { data } = $props();
-  const session = $derived(data.session);
-  
-  // Available data:
-  // - session.user.name
-  // - session.user.email
-  // - session.user.image (avatar)
-  // - session.user.username (GitHub username)
-  // - session.accessToken (for GitHub API calls)
+	let { data } = $props();
+	const session = $derived(data.session);
+
+	// Available data:
+	// - session.user.name
+	// - session.user.email
+	// - session.user.image (avatar)
+	// - session.user.username (GitHub username)
+	// - session.accessToken (for GitHub API calls)
 </script>
 ```
 
@@ -157,10 +157,10 @@ Access the session in any component:
 The access token is stored in the session and can be used with Octokit:
 
 ```typescript
-import { Octokit } from "@octokit/rest";
+import { Octokit } from '@octokit/rest';
 
 const octokit = new Octokit({
-  auth: session.accessToken,
+	auth: session.accessToken
 });
 
 // Now you can make GitHub API calls

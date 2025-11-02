@@ -215,7 +215,7 @@ GITHUB_REPO_NAME=<repository_name>
 
 - [GitHub Issues API Documentation](https://docs.github.com/en/rest/issues)
 - [Agile User Stories Guide](https://www.atlassian.com/agile/project-management/user-stories)
-- [INVEST Criteria](https://en.wikipedia.org/wiki/INVEST_(mnemonic))
+- [INVEST Criteria](<https://en.wikipedia.org/wiki/INVEST_(mnemonic)>)
 - [Writing Acceptance Criteria](https://www.thoughtworks.com/insights/blog/agile-project-management/how-to-write-good-user-stories)
 
 ## Next Steps
