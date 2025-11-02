@@ -35,7 +35,7 @@
 				loadRepositories();
 			}
 		}
-		
+
 		// Check if we just came back from reauthorization
 		const urlParams = new URLSearchParams(window.location.search);
 		if (urlParams.get('reauth') === 'true') {
@@ -70,10 +70,10 @@
 
 	async function loadRepositories() {
 		if (!session?.accessToken) return;
-		
+
 		isLoadingRepos = true;
 		error = '';
-		
+
 		try {
 			// Fetch ALL repositories with pagination
 			let allRepos: GitHubRepo[] = [];
@@ -97,8 +97,8 @@
 					throw new Error(`Failed to fetch repositories: ${response.status}`);
 				}
 
-				const reposData = await response.json() as GitHubRepo[];
-				
+				const reposData = (await response.json()) as GitHubRepo[];
+
 				if (reposData.length === 0) {
 					hasMore = false;
 				} else {
@@ -117,10 +117,10 @@
 					hasMore = false;
 				}
 			}
-			
+
 			// Sort by most recently updated
-			repositories = allRepos.sort((a, b) => 
-				new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+			repositories = allRepos.sort(
+				(a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
 			);
 
 			console.log(`Loaded ${repositories.length} repositories from ${page} page(s)`);
@@ -218,9 +218,10 @@
 	}
 
 	const filteredRepos = $derived(
-		repositories.filter(repo => 
-			repo.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			(repo.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+		repositories.filter(
+			(repo) =>
+				repo.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+				(repo.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
 		)
 	);
 </script>
@@ -255,12 +256,12 @@
 							<span class="info-icon">ℹ️</span>
 							<span>Don't see a repository? Refresh your GitHub access to update permissions.</span>
 						</div>
-						<button 
-							class="btn-refresh" 
+						<button
+							class="btn-refresh"
 							onclick={() => {
 								const callbackUrl = new URL(window.location.href);
 								callbackUrl.searchParams.set('reauth', 'true');
-								signIn('github', { 
+								signIn('github', {
 									redirect: true,
 									callbackUrl: callbackUrl.toString()
 								});
@@ -270,7 +271,7 @@
 							🔄 Refresh Access
 						</button>
 					</div>
-					
+
 					<div class="search-box">
 						<input
 							type="text"
@@ -301,12 +302,13 @@
 							<div class="no-results">No repositories match your search.</div>
 						{:else if filteredRepos.length > 0}
 							<div class="repo-count">
-								Showing {filteredRepos.length} {filteredRepos.length === 1 ? 'repository' : 'repositories'}
+								Showing {filteredRepos.length}
+								{filteredRepos.length === 1 ? 'repository' : 'repositories'}
 							</div>
 						{/if}
 					</div>
 
-					<button class="link-btn" onclick={() => showManualInput = true}>
+					<button class="link-btn" onclick={() => (showManualInput = true)}>
 						Or enter repository manually
 					</button>
 				</div>
@@ -338,7 +340,7 @@
 						{/if}
 					</button>
 					{#if repositories.length > 0}
-						<button class="btn btn-secondary" onclick={() => showManualInput = false}>
+						<button class="btn btn-secondary" onclick={() => (showManualInput = false)}>
 							Back to List
 						</button>
 					{/if}
@@ -355,7 +357,7 @@
 		left: 0;
 		right: 0;
 		bottom: 0;
-		background: rgba(0, 0, 0, 0.6);
+		background: rgba(0, 0, 0, 0.85);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -364,7 +366,8 @@
 	}
 
 	.modal-content {
-		background: white;
+		background: #111111;
+		border: 1px solid #222222;
 		border-radius: 1rem;
 		padding: 2rem;
 		max-width: 600px;
@@ -372,8 +375,8 @@
 		max-height: 90vh;
 		overflow-y: auto;
 		box-shadow:
-			0 20px 25px -5px rgb(0 0 0 / 0.3),
-			0 8px 10px -6px rgb(0 0 0 / 0.2);
+			0 20px 25px -5px rgb(0 0 0 / 0.5),
+			0 8px 10px -6px rgb(0 0 0 / 0.4);
 	}
 
 	.modal-header {
@@ -387,7 +390,7 @@
 		background: none;
 		border: none;
 		font-size: 2rem;
-		color: #9ca3af;
+		color: #666666;
 		cursor: pointer;
 		padding: 0;
 		line-height: 1;
@@ -395,18 +398,18 @@
 	}
 
 	.close-btn:hover {
-		color: #374151;
+		color: #999999;
 	}
 
 	h2 {
 		font-size: 1.75rem;
 		font-weight: 700;
-		color: #111827;
+		color: #e5e5e5;
 		margin: 0;
 	}
 
 	.modal-description {
-		color: #6b7280;
+		color: #999999;
 		margin-bottom: 1.5rem;
 		line-height: 1.5;
 	}
@@ -419,40 +422,43 @@
 		display: block;
 		font-weight: 600;
 		margin-bottom: 0.5rem;
-		color: #374151;
+		color: #e5e5e5;
 	}
 
 	.repo-input {
 		width: 100%;
 		padding: 0.75rem 1rem;
-		border: 2px solid #e5e7eb;
+		border: 2px solid #2a2a2a;
 		border-radius: 0.5rem;
 		font-size: 1rem;
 		transition: all 0.2s;
 		font-family: 'Monaco', 'Courier New', monospace;
+		background: #1a1a1a;
+		color: #e5e5e5;
 	}
 
 	.repo-input:focus {
 		outline: none;
 		border-color: #667eea;
-		box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+		box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
 	}
 
 	.repo-input:disabled {
-		background: #f3f4f6;
+		background: #0f0f0f;
 		cursor: not-allowed;
+		opacity: 0.6;
 	}
 
 	.input-help {
 		display: block;
 		font-size: 0.875rem;
-		color: #9ca3af;
+		color: #666666;
 		margin-top: 0.375rem;
 	}
 
 	.error-message {
-		background: #fef2f2;
-		color: #991b1b;
+		background: #2a1515;
+		color: #ff6b6b;
 		padding: 0.75rem 1rem;
 		border-radius: 0.5rem;
 		border-left: 4px solid #dc2626;
@@ -492,13 +498,13 @@
 	}
 
 	.btn-secondary {
-		background: white;
+		background: #1a1a1a;
 		color: #667eea;
 		border: 2px solid #667eea;
 	}
 
 	.btn-secondary:hover:not(:disabled) {
-		background: #f3f4f6;
+		background: #2a2a2a;
 	}
 
 	.loading-state {
@@ -510,24 +516,26 @@
 		width: 40px;
 		height: 40px;
 		margin: 0 auto 1rem;
-		border: 4px solid #e5e7eb;
+		border: 4px solid #2a2a2a;
 		border-top-color: #667eea;
 		border-radius: 50%;
 		animation: spin 0.8s linear infinite;
 	}
 
 	@keyframes spin {
-		to { transform: rotate(360deg); }
+		to {
+			transform: rotate(360deg);
+		}
 	}
 
 	.loading-state p {
-		color: #6b7280;
+		color: #999999;
 		margin: 0;
 	}
 
 	.loading-subtext {
 		font-size: 0.875rem;
-		color: #9ca3af;
+		color: #666666;
 		margin-top: 0.5rem !important;
 	}
 
@@ -543,15 +551,15 @@
 	}
 
 	.info-banner {
-		background: #eff6ff;
-		border: 1px solid #bfdbfe;
+		background: #1a2332;
+		border: 1px solid #2d3f5f;
 		border-radius: 0.5rem;
 		padding: 0.75rem 1rem;
 		display: flex;
 		align-items: flex-start;
 		gap: 0.5rem;
 		font-size: 0.875rem;
-		color: #1e40af;
+		color: #7fb3ff;
 		line-height: 1.5;
 		flex: 1;
 	}
@@ -591,32 +599,35 @@
 	.search-input {
 		width: 100%;
 		padding: 0.75rem 1rem;
-		border: 2px solid #e5e7eb;
+		border: 2px solid #2a2a2a;
 		border-radius: 0.5rem;
 		font-size: 1rem;
 		transition: all 0.2s;
+		background: #1a1a1a;
+		color: #e5e5e5;
 	}
 
 	.search-input:focus {
 		outline: none;
 		border-color: #667eea;
-		box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+		box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
 	}
 
 	.repo-list {
 		max-height: 400px;
 		overflow-y: auto;
-		border: 2px solid #e5e7eb;
+		border: 2px solid #2a2a2a;
 		border-radius: 0.5rem;
 		margin-bottom: 1rem;
+		background: #0a0a0a;
 	}
 
 	.repo-item {
 		width: 100%;
 		padding: 1rem;
 		border: none;
-		border-bottom: 1px solid #e5e7eb;
-		background: white;
+		border-bottom: 1px solid #2a2a2a;
+		background: #0a0a0a;
 		text-align: left;
 		cursor: pointer;
 		transition: background 0.2s;
@@ -627,11 +638,11 @@
 	}
 
 	.repo-item:hover {
-		background: #f9fafb;
+		background: #1a1a1a;
 	}
 
 	.repo-item:active {
-		background: #f3f4f6;
+		background: #252525;
 	}
 
 	.repo-item-header {
@@ -643,7 +654,7 @@
 
 	.repo-name {
 		font-weight: 600;
-		color: #111827;
+		color: #e5e5e5;
 		font-family: 'Monaco', 'Courier New', monospace;
 		font-size: 0.95rem;
 	}
@@ -656,17 +667,17 @@
 	}
 
 	.badge.private {
-		background: #fef3c7;
-		color: #92400e;
+		background: #3a2f1a;
+		color: #fbbf24;
 	}
 
 	.badge.organization {
-		background: #dbeafe;
-		color: #1e40af;
+		background: #1a2332;
+		color: #7fb3ff;
 	}
 
 	.repo-description {
-		color: #6b7280;
+		color: #999999;
 		font-size: 0.875rem;
 		margin: 0;
 		line-height: 1.4;
@@ -681,22 +692,22 @@
 	.no-results {
 		padding: 2rem;
 		text-align: center;
-		color: #9ca3af;
+		color: #666666;
 	}
 
 	.repo-count {
 		padding: 0.75rem 1rem;
 		text-align: center;
-		color: #6b7280;
+		color: #999999;
 		font-size: 0.875rem;
-		border-top: 1px solid #e5e7eb;
-		background: #f9fafb;
+		border-top: 1px solid #2a2a2a;
+		background: #0f0f0f;
 	}
 
 	.link-btn {
 		background: none;
 		border: none;
-		color: #667eea;
+		color: #8b9aff;
 		font-weight: 600;
 		cursor: pointer;
 		padding: 0.5rem;
@@ -706,7 +717,7 @@
 	}
 
 	.link-btn:hover {
-		color: #764ba2;
+		color: #a8b3ff;
 		text-decoration: underline;
 	}
 </style>
