@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import { signOut } from '@auth/sveltekit/client';
 	import CommandPalette from './CommandPalette.svelte';
+	import { goto } from '$app/navigation';
 
 	let {
 		onSessionSelect = (session: ChatSession) => {},
@@ -190,12 +191,24 @@
 		
 		// Handle navigation actions
 		if (navId === 'chat') {
-			// Start a new chat session
-			handleNewSession();
+			// Navigate to root for new chat and clear current session
+			sessionStore.clearCurrentSession();
+			goto('/');
+			
+			// Close sidebar on mobile after navigation
+			if (window.innerWidth <= 480) {
+				isCollapsed = true;
+			}
 		} else if (navId === 'voice') {
-			// Start a new session and activate voice mode
-			handleNewSession();
+			// Navigate to root and activate voice mode
+			sessionStore.clearCurrentSession();
+			goto('/');
 			onStartVoice();
+			
+			// Close sidebar on mobile after navigation
+			if (window.innerWidth <= 480) {
+				isCollapsed = true;
+			}
 		}
 		
 		console.log('Navigation clicked:', navId);

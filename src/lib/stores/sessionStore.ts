@@ -1,4 +1,6 @@
 import { writable, derived, get } from 'svelte/store';
+import { goto } from '$app/navigation';
+import { browser } from '$app/environment';
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -82,7 +84,7 @@ function createSessionStore() {
     subscribe,
 
     // Create a new session
-    createSession: (repository: string, title?: string) => {
+    createSession: (repository: string, title?: string, skipNavigation = false) => {
       const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const now = Date.now();
 
@@ -101,6 +103,14 @@ function createSessionStore() {
         sessions: [newSession, ...state.sessions]
       }));
 
+      // Only navigate if not skipped (to prevent navigation during active operations)
+      if (browser && !skipNavigation) {
+        const targetPath = `/c/${sessionId}`;
+        if (window.location.pathname !== targetPath) {
+          goto(targetPath);
+        }
+      }
+
       return sessionId;
     },
 
@@ -117,6 +127,11 @@ function createSessionStore() {
           currentSessionId: sessionId
         };
       });
+
+      // Navigate to the session URL if not already there
+      if (browser && !window.location.pathname.includes(`/c/${sessionId}`)) {
+        goto(`/c/${sessionId}`);
+      }
     },
 
     // Add a message to the current session
@@ -130,6 +145,7 @@ function createSessionStore() {
         const sessions = state.sessions.map((session) => {
           if (session.id === state.currentSessionId) {
             const updatedMessages = [...session.messages, message];
+
             return {
               ...session,
               messages: updatedMessages,
@@ -266,7 +282,7 @@ function createSessionStore() {
     },
 
     // Find or create session for repository
-    getOrCreateSessionForRepo: (repository: string) => {
+    getOrCreateSessionForRepo: (repository: string, skipNavigation = false) => {
       const state = get({ subscribe });
 
       // Check if current session is for this repo
@@ -295,6 +311,14 @@ function createSessionStore() {
         currentSessionId: sessionId,
         sessions: [newSession, ...currentState.sessions]
       }));
+
+      // Only navigate if not skipped (to prevent navigation during active operations)
+      if (browser && !skipNavigation) {
+        const targetPath = `/c/${sessionId}`;
+        if (window.location.pathname !== targetPath) {
+          goto(targetPath);
+        }
+      }
 
       return sessionId;
     },

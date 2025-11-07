@@ -62,6 +62,12 @@ async function setupOpenAIConnection(
 
 	// Forward messages from OpenAI to client and handle tool calls
 	openaiWs.addEventListener('message', async (event: any) => {
+		// Early return if client has disconnected - don't process messages for closed connections
+		if (clientWs.readyState !== WebSocket.OPEN) {
+			console.log('Client disconnected, skipping message processing');
+			return;
+		}
+
 		const message = JSON.parse(event.data);
 
 		// Log all message types for debugging (except audio data)
@@ -86,6 +92,12 @@ async function setupOpenAIConnection(
 			const callId = message.item.call_id;
 
 			console.log('Tool call executing:', functionName, 'with args:', args);
+
+			// Check if client is still connected before executing potentially slow tool calls
+			if (clientWs.readyState !== WebSocket.OPEN) {
+				console.log('Client disconnected, skipping tool execution');
+				return;
+			}
 
 			try {
 				let result: any = null;
@@ -161,6 +173,12 @@ async function setupOpenAIConnection(
 
 					default:
 						throw new Error(`Unknown function: ${functionName}`);
+				}
+
+				// Check if client disconnected during tool execution
+				if (clientWs.readyState !== WebSocket.OPEN) {
+					console.log('Client disconnected during tool execution, not sending result');
+					return;
 				}
 
 				// Send function result back to OpenAI

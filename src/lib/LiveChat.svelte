@@ -1,20 +1,24 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { browser } from '$app/environment';
 	import MarkdownRenderer from './MarkdownRenderer.svelte';
 	import SessionsPanel from './SessionsPanel.svelte';
 	import { signIn, signOut } from '@auth/sveltekit/client';
 	import { sessionStore, currentSession, type ChatSession, type ChatMessage } from './stores/sessionStore';
 	import { repoStore } from './stores/repoStore';
+	import { goto } from '$app/navigation';
 
 	// Accept repository as a prop
 	let {
 		repository = '',
 		session = null,
-		changeRepo = () => {}
+		changeRepo = () => {},
+		sessionId = undefined
 	}: {
 		repository?: string;
 		session?: any;
 		changeRepo?: () => void;
+		sessionId?: string;
 	} = $props();
 
 	// Extract repository name without org prefix
@@ -49,6 +53,7 @@
 	let isIntentionalDisconnect = false; // Track if disconnect is intentional (e.g., switching repos)
 	let sidebarCollapsed = $state(false); // Track sidebar collapsed state
 	let inputCentered = $state(true); // Track if input should be centered (true when no messages)
+	let isNavigatingToSession = false; // Track if we're navigating after sending first message
 
 	// Auto-scroll to bottom when transcript changes
 	$effect(() => {
@@ -63,27 +68,49 @@
 
 	// Reconnect when repository changes
 	$effect(() => {
-		console.log('Repository effect triggered:', { repository, connectedRepository });
+		console.log('Repository effect triggered:', { repository, connectedRepository, sessionId });
+		
+		// Clear any previous errors when switching sessions
+		error = '';
+		
+		// If sessionId is provided, switch to that session
+		if (sessionId) {
+			const currentSession = sessionStore.getCurrentSession();
+			if (!currentSession || currentSession.id !== sessionId) {
+				sessionStore.switchSession(sessionId);
+			}
+			
+			// Load transcript from session when sessionId is provided
+			const sessionData = sessionStore.getCurrentSession();
+			if (sessionData) {
+				// Convert ChatMessage[] to transcript format
+				transcript = sessionData.messages.map(msg => ({
+					role: msg.role,
+					text: msg.text
+				}));
+			}
+		}
+		
 		// Only reconnect if repository actually changed
 		if (repository !== connectedRepository) {
 			if (repository) {
-				// Repository was selected or changed, create/load session and connect
-				console.log('Repository changed, connecting to:', repository);
+				// Check if we already have a working connection to this repo
+				const hasWorkingConnection = ws && ws.readyState === WebSocket.OPEN && connectedRepository === repository;
 				
-				// Get or create session for this repository
-				const sessionId = sessionStore.getOrCreateSessionForRepo(repository);
-				
-				// Load session messages into local transcript
-				const currentSessionData = sessionStore.getCurrentSession();
-				if (currentSessionData) {
-					// Convert ChatMessage[] to transcript format
-					transcript = currentSessionData.messages.map(msg => ({
-						role: msg.role,
-						text: msg.text
-					}));
+				if (hasWorkingConnection) {
+					console.log('WebSocket already connected to this repository, skipping reconnect');
+				} else {
+					// Repository was selected or changed
+					console.log('Repository changed, connecting to:', repository);
+					
+					// Clear transcript when switching repos (unless we have a sessionId)
+					if (!sessionId) {
+						transcript = [];
+					}
+					
+					// Connect to the new repository
+					connectWebSocket();
 				}
-				
-				connectWebSocket();
 				
 				// Focus the text input when repository is selected
 				setTimeout(() => {
@@ -182,9 +209,10 @@
 				const handleError = (event: Event) => {
 					clearTimeout(timeout);
 					console.error('WebSocket connection error:', event);
-					// Only show error if not an intentional disconnect or repository switch
-					if (!isIntentionalDisconnect && repository === connectedRepository) {
-						error = 'Connection error occurred';
+					// Don't show error on intentional disconnects or when switching repos
+					// This prevents error alerts when navigating between sessions
+					if (!isIntentionalDisconnect) {
+						console.warn('WebSocket connection failed, will retry if needed');
 					}
 					reject(new Error('WebSocket connection failed'));
 				};
@@ -362,6 +390,12 @@
 						console.log('Response done:', data.response?.id);
 						processingResponse = false;
 						currentResponseId = null;
+						
+						// Navigate to session URL after response is complete (if on root path)
+						if (typeof window !== 'undefined' && window.location.pathname === '/' && $currentSession) {
+							console.log('Response complete, navigating to session URL');
+							goto(`/c/${$currentSession.id}`, { replaceState: true });
+						}
 						break;
 
 					case 'response.cancelled':
@@ -398,14 +432,18 @@
 				if (event.code === 1008 || event.reason?.includes('Authentication')) {
 					error = 'Authentication required. Please sign in.';
 				}
-				// Only show error if not intentional, we were connected, and not switching repos
-				else if (!isIntentionalDisconnect && wasConnectedToRepo && repository === wasConnectedToRepo) {
-					error = 'Connection lost';
+				// Only show connection lost error if user was actively using the connection
+				// Don't show errors when switching sessions or navigating
+				else if (!isIntentionalDisconnect && processingResponse) {
+					error = 'Connection lost during response';
 				}
 			};
 		} catch (err) {
 			console.error('Error connecting:', err);
-			error = err instanceof Error ? err.message : 'Failed to connect';
+			// Only show error if we're not switching repos/sessions
+			if (!isIntentionalDisconnect) {
+				error = err instanceof Error ? err.message : 'Failed to connect';
+			}
 		}
 	}
 
@@ -765,10 +803,11 @@
 	function addTranscript(role: string, text: string) {
 		transcript = [...transcript, { role, text }];
 		
-		// Ensure we have an active session before adding message
-		if (!$currentSession && repository) {
-			console.log('No active session found, creating one before adding message');
-			sessionStore.createSession(repository);
+		// Only add to session store if we have an active session
+		// (session should already be created before calling this function)
+		if (!$currentSession) {
+			console.warn('No active session when adding transcript - message will not be saved');
+			return;
 		}
 		
 		// Sync to session store
@@ -799,9 +838,17 @@
 		textMessage = '';
 
 		// Ensure we have an active session - create one if needed
-		if (!$currentSession && repository) {
+		let currentSessionId = $currentSession?.id;
+		
+		if (!currentSessionId && repository) {
 			console.log('No active session when sending message, creating new session');
-			sessionStore.createSession(repository);
+			// Always skip navigation - we'll navigate after response.created
+			currentSessionId = sessionStore.createSession(repository, undefined, true);
+		}
+
+		if (!currentSessionId) {
+			error = 'Failed to create session. Please try again.';
+			return;
 		}
 
 		// Connect WebSocket if not already connected
@@ -862,6 +909,9 @@
 		// Request response from AI (explicit for text messages)
 		console.log('Requesting AI response for text message');
 		ws.send(JSON.stringify({ type: 'response.create' }));
+		
+		// Navigation will happen automatically in response.created handler
+		// This prevents interrupting the response stream
 	}
 
 	function handleKeyDown(event: KeyboardEvent) {
@@ -985,26 +1035,8 @@
 	}
 
 	function handleSessionSelect(session: ChatSession) {
-		// Switch to the selected session
-		sessionStore.switchSession(session.id);
-		
-		// Load messages from the session
-		transcript = session.messages.map(msg => ({
-			role: msg.role,
-			text: msg.text
-		}));
-		
-		// If session is for different repo, switch to that repo
-		if (session.repository !== repository) {
-			console.log('Switching to repository:', session.repository);
-			// Update the repo store to trigger repository change
-			repoStore.set(session.repository);
-		}
-		
-		// Focus the text input when switching sessions
-		setTimeout(() => {
-			textInputRef?.focus();
-		}, 0);
+		// Navigate to the session URL
+		goto(`/c/${session.id}`);
 	}
 
 	onDestroy(() => {
