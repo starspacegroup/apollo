@@ -12,7 +12,7 @@
 	<title>AI Chat - Apollo</title>
 	<meta
 		name="description"
-		content="Real-time text and voice chat with AI powered by OpenAI and Cloudflare"
+		content="AI Agile Product Owner Assistant for GitHub Repositories"
 	/>
 </svelte:head>
 
