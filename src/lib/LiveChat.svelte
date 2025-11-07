@@ -392,7 +392,8 @@
 						currentResponseId = null;
 						
 						// Navigate to session URL after response is complete (if on root path)
-						if (typeof window !== 'undefined' && window.location.pathname === '/' && $currentSession) {
+						// But don't navigate if in voice mode to avoid disconnecting
+						if (typeof window !== 'undefined' && window.location.pathname === '/' && $currentSession && !isVoiceMode) {
 							console.log('Response complete, navigating to session URL');
 							goto(`/c/${$currentSession.id}`, { replaceState: true });
 						}
@@ -495,6 +496,13 @@
 			error = '';
 			isConnecting = true;
 
+			// Ensure we have a repository selected
+			if (!repository) {
+				error = 'Please select a repository first';
+				isConnecting = false;
+				return;
+			}
+
 			// Clean up any existing voice session state first
 			if (isVoiceMode) {
 				console.log('Cleaning up existing voice session before starting new one');
@@ -512,6 +520,20 @@
 			shouldCancelAudio = false;
 			processingResponse = false;
 			currentResponseId = null;
+
+			// Create a new session for voice chat (similar to text chat)
+			let currentSessionId = $currentSession?.id;
+			
+			if (!currentSessionId) {
+				console.log('Creating new session for voice chat');
+				currentSessionId = sessionStore.createSession(repository, undefined, true);
+			}
+
+			if (!currentSessionId) {
+				error = 'Failed to create session. Please try again.';
+				isConnecting = false;
+				return;
+			}
 
 			// Connect WebSocket if not already connected (this now waits for connection)
 			if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -562,9 +584,15 @@
 	// Export function to allow parent components to start voice mode
 	export function activateVoiceMode() {
 		if (!isVoiceMode && repository) {
+			// Create new session when activating voice mode from sidebar
+			if (!$currentSession) {
+				console.log('Creating new session when activating voice mode');
+				sessionStore.createSession(repository, undefined, true);
+			}
 			startVoiceChat();
 		} else if (!repository) {
 			console.warn('Cannot start voice mode: no repository selected');
+			error = 'Please select a repository first';
 		}
 	}
 
@@ -968,6 +996,12 @@
 
 		// Disable server VAD for text chat mode
 		disableServerVAD();
+
+		// Navigate to session URL if we're still on root path and have a session
+		if (typeof window !== 'undefined' && window.location.pathname === '/' && $currentSession) {
+			console.log('Voice chat stopped, navigating to session URL');
+			goto(`/c/${$currentSession.id}`, { replaceState: true });
+		}
 
 		// Keep WebSocket connection for text chat
 	}
