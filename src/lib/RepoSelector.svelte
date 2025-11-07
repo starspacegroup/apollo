@@ -660,7 +660,6 @@
 		width: 100%;
 		padding: 1rem;
 		border: none;
-		border-bottom: 1px solid var(--modal-repo-list-border);
 		background: var(--modal-repo-item-bg);
 		text-align: left;
 		cursor: pointer;
@@ -734,7 +733,6 @@
 		text-align: center;
 		color: var(--modal-text-secondary);
 		font-size: 0.875rem;
-		border-top: 1px solid var(--modal-repo-list-border);
 		background: var(--modal-count-bg);
 	}
 

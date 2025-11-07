@@ -403,7 +403,6 @@
 		align-items: center;
 		justify-content: center;
 		height: 56px;
-		border-bottom: 1px solid #2a2a2a;
 		padding: 0 1rem;
 	}
 
@@ -545,7 +544,6 @@
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
-		border-top: 1px solid #2a2a2a;
 		margin-top: 0.5rem;
 	}
 
@@ -627,7 +625,6 @@
 
 	/* Footer */
 	.sidebar-footer {
-		border-top: 1px solid #2a2a2a;
 		padding: 0.5rem 0.75rem 0.75rem 0.75rem;
 		position: relative;
 	}
@@ -674,7 +671,6 @@
 
 	/* Collapse Button */
 	.collapse-btn {
-		border-top: 1px solid #2a2a2a;
 		margin-top: 0.25rem;
 		padding-top: 0.75rem !important;
 	}
@@ -686,7 +682,6 @@
 	/* User Item */
 	.user-item {
 		margin-top: 0.25rem;
-		border-top: 1px solid #2a2a2a;
 		padding-top: 0.75rem;
 	}
 

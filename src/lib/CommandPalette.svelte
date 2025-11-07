@@ -347,7 +347,6 @@
 		align-items: center;
 		gap: 0.75rem;
 		padding: 1rem 1.25rem;
-		border-bottom: 1px solid #2a2a2a;
 	}
 
 	.search-icon {
@@ -476,7 +475,6 @@
 	}
 
 	.command-palette-footer {
-		border-top: 1px solid #2a2a2a;
 		padding: 0.75rem 1.25rem;
 	}
 

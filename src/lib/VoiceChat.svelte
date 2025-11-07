@@ -1142,7 +1142,6 @@
 		align-items: center;
 		padding: 0.75rem 1rem;
 		background: #111111;
-		border-bottom: 1px solid #222222;
 		height: 60px;
 		flex-shrink: 0;
 		/* Add safe area for notches */
@@ -1491,7 +1490,6 @@
 		flex-shrink: 0;
 		padding: 1rem;
 		background: #0a0a0a;
-		border-top: 1px solid #222222;
 		/* Add safe area for mobile home indicator */
 		padding-bottom: max(1rem, env(safe-area-inset-bottom));
 		padding-left: max(1rem, env(safe-area-inset-left));
