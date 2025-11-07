@@ -351,7 +351,35 @@ export const GET: RequestHandler = async ({ request, platform, url, locals }) =>
 	const [client, server] = Object.values(webSocketPair);
 	server.accept();
 
-	setupOpenAIConnection(server, OPENAI_API_KEY, repository, accessToken);
+	// Only setup OpenAI connection if repository is selected
+	if (repository) {
+		setupOpenAIConnection(server, OPENAI_API_KEY, repository, accessToken);
+	} else {
+		// Send error message immediately since WebSocket is already accepted
+		setTimeout(() => {
+			if (server.readyState === WebSocket.OPEN) {
+				server.send(
+					JSON.stringify({
+						type: 'error',
+						error: { message: 'Please select a repository to start chatting' }
+					})
+				);
+			}
+		}, 0);
+
+		// Listen for messages from client but don't forward anywhere
+		server.addEventListener('message', (event: any) => {
+			// Client trying to send messages without a repository selected
+			if (server.readyState === WebSocket.OPEN) {
+				server.send(
+					JSON.stringify({
+						type: 'error',
+						error: { message: 'Please select a repository to start chatting' }
+					})
+				);
+			}
+		});
+	}
 
 	return new Response(null, {
 		status: 101,

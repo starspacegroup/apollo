@@ -42,6 +42,7 @@
 	let audioProcessor: ScriptProcessorNode | null = null;
 	let messagesContainerRef = $state<HTMLDivElement>();
 	let showUserMenu = $state(false);
+	let connectedRepository = $state(''); // Track which repository we're connected to
 
 	// Auto-scroll to bottom when transcript changes
 	$effect(() => {
@@ -54,9 +55,32 @@
 		}
 	});
 
-	// Auto-connect on mount
+	// Reconnect when repository changes
+	$effect(() => {
+		console.log('Repository effect triggered:', { repository, connectedRepository });
+		// Only reconnect if repository actually changed
+		if (repository !== connectedRepository) {
+			if (repository) {
+				// Repository was selected or changed, connect to WebSocket
+				console.log('Repository changed, connecting to:', repository);
+				connectWebSocket();
+			} else {
+				// Repository was cleared, disconnect
+				console.log('Repository cleared, disconnecting');
+				if (ws) {
+					ws.close();
+					ws = null;
+					isConnected = false;
+				}
+				connectedRepository = '';
+			}
+		}
+	});
+
+	// Auto-connect on mount only if repository is selected
 	onMount(() => {
-		connectWebSocket();
+		// Connection will be handled by the $effect above
+		// Just setup cleanup handlers
 
 		// Close user menu when clicking outside
 		const handleClickOutside = (e: MouseEvent) => {
@@ -74,8 +98,16 @@
 	});
 
 	async function connectWebSocket() {
-		if (ws && ws.readyState === WebSocket.OPEN) {
-			return; // Already connected
+		// Close existing connection if any
+		if (ws) {
+			ws.close();
+			ws = null;
+		}
+
+		if (!repository) {
+			// Don't connect if no repository is selected
+			connectedRepository = '';
+			return;
 		}
 
 		try {
@@ -83,12 +115,13 @@
 
 			// Connect to WebSocket with repository parameter
 			const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-			const wsUrl = `${protocol}//${window.location.host}/api/voice${repository ? `?repo=${encodeURIComponent(repository)}` : ''}`;
+			const wsUrl = `${protocol}//${window.location.host}/api/voice?repo=${encodeURIComponent(repository)}`;
 			ws = new WebSocket(wsUrl);
 
 			ws.onopen = () => {
 				isConnected = true;
-				console.log('Connected to AI chat');
+				connectedRepository = repository; // Mark which repository we're connected to
+				console.log('Connected to AI chat for repository:', repository);
 				// Disable server VAD by default (enable only when voice chat starts)
 				setTimeout(() => disableServerVAD(), 500);
 			};
@@ -282,6 +315,7 @@
 				isConnected = false;
 				isRecording = false;
 				isVoiceMode = false;
+				connectedRepository = ''; // Clear connected repository on close
 				console.log('Disconnected from AI chat');
 				
 				// If connection was rejected due to authentication (401)
@@ -700,13 +734,22 @@
 	<nav class="top-nav">
 		<div class="nav-left">
 			<h1 class="logo">Apollo</h1>
-			{#if session?.user && repository}
-				<button onclick={changeRepo} class="repo-badge" title={repository}>
-					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-					</svg>
-					<span>{repoName}</span>
-				</button>
+			{#if session?.user}
+				{#if repository}
+					<button onclick={changeRepo} class="repo-badge" title={repository}>
+						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+						</svg>
+						<span>{repoName}</span>
+					</button>
+				{:else}
+					<button onclick={changeRepo} class="repo-badge select-repo" title="Select a repository">
+						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+						</svg>
+						<span>Select Repository</span>
+					</button>
+				{/if}
 			{/if}
 		</div>
 
@@ -811,7 +854,25 @@
 	<!-- Main Chat Area -->
 	<div class="chat-area">
 		<div class="messages-container" bind:this={messagesContainerRef}>
-			{#if transcript.length === 0}
+			{#if !repository}
+				<div class="welcome-state">
+					<div class="welcome-icon">
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="64"
+							height="64"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.5"
+						>
+							<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+						</svg>
+					</div>
+					<h2>Select a Repository</h2>
+					<p>Choose a GitHub repository from the selector above to start chatting with Apollo</p>
+				</div>
+			{:else if transcript.length === 0}
 				<div class="welcome-state">
 					<div class="welcome-icon">
 						<svg
@@ -872,15 +933,16 @@
 					bind:this={textInputRef}
 					bind:value={textMessage}
 					onkeydown={handleKeyDown}
-					placeholder="Message Apollo..."
+					placeholder={repository ? "Message Apollo..." : "Select a repository to start chatting"}
 					rows="1"
 					class="message-input"
+					disabled={!repository}
 				></textarea>
 
 				<button
 					class="send-btn"
 					onclick={sendTextMessage}
-					disabled={!textMessage.trim()}
+					disabled={!textMessage.trim() || !repository}
 					title="Send message"
 				>
 					<svg
@@ -906,7 +968,8 @@
 					class:speaking={isSpeaking}
 					class:active={isVoiceMode}
 					onclick={isVoiceMode ? stopVoiceChat : startVoiceChat}
-					title={isVoiceMode ? 'Stop voice chat' : 'Start voice chat'}
+					disabled={!repository}
+					title={!repository ? 'Select a repository to use voice chat' : (isVoiceMode ? 'Stop voice chat' : 'Start voice chat')}
 				>
 					<div class="waveform-icon">
 						{#if isVoiceMode}
@@ -1038,6 +1101,17 @@
 		background: #222222;
 		border-color: #444444;
 		color: #e5e5e5;
+	}
+
+	.repo-badge.select-repo {
+		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		border-color: transparent;
+		color: #ffffff;
+	}
+
+	.repo-badge.select-repo:hover {
+		opacity: 0.9;
+		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 	}
 
 	.nav-right {
@@ -1322,7 +1396,6 @@
 	}
 
 	.message-content {
-		white-space: pre-wrap;
 		word-wrap: break-word;
 	}
 

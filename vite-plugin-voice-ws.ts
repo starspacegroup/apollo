@@ -150,10 +150,14 @@ export function voiceWebSocketPlugin(): Plugin {
 			const wss = new WebSocketServer({ noServer: true });
 
 			server.httpServer?.on('upgrade', (request: IncomingMessage, socket: Duplex, head: Buffer) => {
-				// Only handle /api/voice WebSocket upgrades
-				if (request.url !== '/api/voice') {
+				// Only handle /api/voice WebSocket upgrades (with or without query params)
+				const url = new URL(request.url || '', `http://${request.headers.host}`);
+				if (url.pathname !== '/api/voice') {
 					return;
 				}
+
+				// Extract repository from query params
+				const repository = url.searchParams.get('repo') || undefined;
 
 				// Try to get API key from process.env first, then fall back to our loaded env vars
 				const OPENAI_API_KEY = process.env.OPENAI_API_KEY || envVars.OPENAI_API_KEY;
@@ -166,8 +170,16 @@ export function voiceWebSocketPlugin(): Plugin {
 					return;
 				}
 
+				// Only setup connection if repository is selected
+				if (!repository) {
+					socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+					socket.destroy();
+					console.error('Repository parameter required');
+					return;
+				}
+
 				wss.handleUpgrade(request, socket, head, (ws) => {
-					console.log('Client connected to voice WebSocket');
+					console.log('Client connected to voice WebSocket for repository:', repository);
 					setupOpenAIConnection(ws, OPENAI_API_KEY);
 				});
 			});
