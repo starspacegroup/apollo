@@ -837,7 +837,6 @@
 		<!-- Top Navigation Bar -->
 		<nav class="top-nav">
 			<div class="nav-left">
-				<h1 class="logo">Apollo</h1>
 				{#if session?.user}
 					{#if repository}
 						<button onclick={changeRepo} class="repo-badge connected" title="Connected to {repository}\nClick to change repository">
@@ -1156,16 +1155,6 @@
 		display: flex;
 		align-items: center;
 		gap: 1rem;
-	}
-
-	.logo {
-		font-size: 1.25rem;
-		font-weight: 700;
-		margin: 0;
-		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-		-webkit-background-clip: text;
-		-webkit-text-fill-color: transparent;
-		background-clip: text;
 	}
 
 	.repo-badge {
@@ -1916,10 +1905,6 @@
 			padding: 0.5rem 0.75rem;
 			height: auto;
 			min-height: 50px;
-		}
-
-		.logo {
-			font-size: 1.125rem;
 		}
 
 		.repo-badge {

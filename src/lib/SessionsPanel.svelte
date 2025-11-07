@@ -209,12 +209,9 @@
 {/if}
 
 <div class="sessions-sidebar" class:collapsed={isCollapsed}>
-	<!-- Brand/Logo -->
-	<div class="sidebar-brand">
-		<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-			<circle cx="12" cy="12" r="10"></circle>
-			<path d="M12 6v12M6 12h12"></path>
-		</svg>
+	<!-- Apollo Logo -->
+	<div class="sidebar-header">
+		<h1 class="logo">Apollo</h1>
 	</div>
 
 	<!-- Search -->
@@ -290,15 +287,6 @@
 
 	<!-- Bottom Menu & User -->
 	<div class="sidebar-footer">
-		<!-- Collapse/Expand Toggle -->
-		<button class="menu-item collapse-btn" onclick={toggleCollapsed} title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
-			<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-				<polyline points="11 17 6 12 11 7"></polyline>
-				<polyline points="18 17 13 12 18 7"></polyline>
-			</svg>
-			<span class="menu-label">Collapse</span>
-		</button>
-
 		<!-- User Menu -->
 		{#if session?.user}
 			<button 
@@ -319,6 +307,15 @@
 				</svg>
 			</button>
 		{/if}
+
+		<!-- Collapse/Expand Toggle -->
+		<button class="menu-item collapse-btn" onclick={toggleCollapsed} title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+			<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<polyline points="11 17 6 12 11 7"></polyline>
+				<polyline points="18 17 13 12 18 7"></polyline>
+			</svg>
+			<span class="menu-label">Collapse</span>
+		</button>
 	</div>
 </div>
 
@@ -400,15 +397,50 @@
 	.sessions-sidebar.collapsed {
 		width: 52px;
 	}
-
-	/* Brand/Logo */
-	.sidebar-brand {
+	/* Header with Apollo Logo */
+	.sidebar-header {
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		height: 56px;
 		border-bottom: 1px solid #2a2a2a;
-		color: #667eea;
+		padding: 0 1rem;
+	}
+
+	.logo {
+		font-size: 1.25rem;
+		font-weight: 700;
+		margin: 0;
+		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		-webkit-background-clip: text;
+		-webkit-text-fill-color: transparent;
+		background-clip: text;
+	}
+
+	.sessions-sidebar.collapsed .sidebar-header {
+		padding: 0 0.5rem;
+	}
+
+	.sessions-sidebar.collapsed .logo {
+		font-size: 0;
+		width: 24px;
+		height: 24px;
+		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		-webkit-background-clip: initial;
+		-webkit-text-fill-color: initial;
+		background-clip: initial;
+		border-radius: 4px;
+	}
+
+	.sessions-sidebar.collapsed .logo::before {
+		content: 'A';
+		font-size: 1rem;
+		color: white;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		height: 100%;
 	}
 
 	/* Search */
