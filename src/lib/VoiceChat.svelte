@@ -43,6 +43,7 @@
 	let messagesContainerRef = $state<HTMLDivElement>();
 	let showUserMenu = $state(false);
 	let connectedRepository = $state(''); // Track which repository we're connected to
+	let isIntentionalDisconnect = false; // Track if disconnect is intentional (e.g., switching repos)
 
 	// Auto-scroll to bottom when transcript changes
 	$effect(() => {
@@ -68,6 +69,7 @@
 				// Repository was cleared, disconnect
 				console.log('Repository cleared, disconnecting');
 				if (ws) {
+					isIntentionalDisconnect = true; // Mark as intentional
 					ws.close();
 					ws = null;
 					isConnected = false;
@@ -100,6 +102,7 @@
 	async function connectWebSocket() {
 		// Close existing connection if any
 		if (ws) {
+			isIntentionalDisconnect = true; // Mark as intentional before closing
 			ws.close();
 			ws = null;
 		}
@@ -111,7 +114,8 @@
 		}
 
 		try {
-			error = '';
+			error = ''; // Clear any previous errors
+			isIntentionalDisconnect = false; // Reset flag for new connection
 
 			// Connect to WebSocket with repository parameter
 			const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -308,19 +312,27 @@
 
 			ws.onerror = (event) => {
 				console.error('WebSocket error:', event);
-				error = 'Connection error occurred';
+				// Only show error if not an intentional disconnect or repository switch
+				if (!isIntentionalDisconnect && repository === connectedRepository) {
+					error = 'Connection error occurred';
+				}
 			};
 
 			ws.onclose = (event) => {
 				isConnected = false;
 				isRecording = false;
 				isVoiceMode = false;
+				const wasConnectedToRepo = connectedRepository;
 				connectedRepository = ''; // Clear connected repository on close
 				console.log('Disconnected from AI chat');
 				
 				// If connection was rejected due to authentication (401)
 				if (event.code === 1008 || event.reason?.includes('Authentication')) {
 					error = 'Authentication required. Please sign in.';
+				}
+				// Only show error if not intentional, we were connected, and not switching repos
+				else if (!isIntentionalDisconnect && wasConnectedToRepo && repository === wasConnectedToRepo) {
+					error = 'Connection lost';
 				}
 			};
 		} catch (err) {
@@ -736,14 +748,17 @@
 			<h1 class="logo">Apollo</h1>
 			{#if session?.user}
 				{#if repository}
-					<button onclick={changeRepo} class="repo-badge" title={repository}>
+					<button onclick={changeRepo} class="repo-badge connected" title="Connected to {repository}\nClick to change repository">
 						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 							<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
 						</svg>
-						<span>{repoName}</span>
+						<span class="repo-full-name">{repository}</span>
+						{#if isConnected}
+							<span class="connection-indicator" title="Connected to AI"></span>
+						{/if}
 					</button>
 				{:else}
-					<button onclick={changeRepo} class="repo-badge select-repo" title="Select a repository">
+					<button onclick={changeRepo} class="repo-badge select-repo" title="Select a repository to start">
 						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 							<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
 						</svg>
@@ -887,8 +902,38 @@
 							<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
 						</svg>
 					</div>
-					<h2>How can I help you today?</h2>
-					<p>Ask me anything about your GitHub repository or start a voice conversation</p>
+					<h2>Connected to {repository}</h2>
+					<p class="welcome-description">I can help you with:</p>
+					<div class="capabilities-list">
+						<div class="capability-item">
+							<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<circle cx="12" cy="12" r="10"></circle>
+								<path d="M12 16v-4"></path>
+								<path d="M12 8h.01"></path>
+							</svg>
+							<span>Creating and managing GitHub issues</span>
+						</div>
+						<div class="capability-item">
+							<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<circle cx="11" cy="11" r="8"></circle>
+								<path d="m21 21-4.35-4.35"></path>
+							</svg>
+							<span>Searching through your codebase</span>
+						</div>
+						<div class="capability-item">
+							<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+							</svg>
+							<span>Getting repository information and stats</span>
+						</div>
+						<div class="capability-item">
+							<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+							</svg>
+							<span>Adding comments to issues</span>
+						</div>
+					</div>
+					<p class="welcome-tip">Type a message or start a voice conversation to get started!</p>
 				</div>
 			{:else}
 				<div class="messages-list">
@@ -1095,12 +1140,47 @@
 		font-size: 0.875rem;
 		cursor: pointer;
 		transition: all 0.2s;
+		position: relative;
+	}
+
+	.repo-badge.connected {
+		border-color: rgba(16, 185, 129, 0.3);
+		background: rgba(16, 185, 129, 0.05);
+	}
+
+	.repo-badge .repo-full-name {
+		color: #e5e5e5;
+		font-weight: 500;
+	}
+
+	.connection-indicator {
+		width: 8px;
+		height: 8px;
+		background: #10b981;
+		border-radius: 50%;
+		animation: pulse-glow 2s ease-in-out infinite;
+	}
+
+	@keyframes pulse-glow {
+		0%, 100% {
+			opacity: 1;
+			box-shadow: 0 0 4px rgba(16, 185, 129, 0.6);
+		}
+		50% {
+			opacity: 0.6;
+			box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);
+		}
 	}
 
 	.repo-badge:hover {
 		background: #222222;
 		border-color: #444444;
 		color: #e5e5e5;
+	}
+
+	.repo-badge.connected:hover {
+		background: rgba(16, 185, 129, 0.1);
+		border-color: rgba(16, 185, 129, 0.4);
 	}
 
 	.repo-badge.select-repo {
@@ -1335,6 +1415,50 @@
 		color: #a0a0a0;
 		margin: 0;
 		max-width: 500px;
+	}
+
+	.welcome-description {
+		font-weight: 600;
+		color: #e5e5e5;
+		margin-top: 1rem !important;
+	}
+
+	.capabilities-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		margin-top: 1rem;
+		text-align: left;
+		max-width: 400px;
+		width: 100%;
+	}
+
+	.capability-item {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.75rem 1rem;
+		background: #1a1a1a;
+		border: 1px solid #333333;
+		border-radius: 0.5rem;
+		color: #e5e5e5;
+		transition: all 0.2s;
+	}
+
+	.capability-item:hover {
+		background: #222222;
+		border-color: #444444;
+	}
+
+	.capability-item svg {
+		flex-shrink: 0;
+		color: #667eea;
+	}
+
+	.welcome-tip {
+		margin-top: 1.5rem !important;
+		font-size: 0.875rem !important;
+		font-style: italic;
 	}
 
 	.messages-list {

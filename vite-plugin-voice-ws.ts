@@ -52,7 +52,7 @@ Your role is to:
 
 Respond in a conversational manner and help users create high-quality, well-structured GitHub issues.`;
 
-function setupOpenAIConnection(clientWs: WebSocket, OPENAI_API_KEY: string) {
+function setupOpenAIConnection(clientWs: WebSocket, OPENAI_API_KEY: string, repository: string) {
 	// Connect to OpenAI Realtime API
 	const url = new URL('wss://api.openai.com/v1/realtime');
 	url.searchParams.set('model', 'gpt-4o-mini-realtime-preview');
@@ -80,7 +80,7 @@ function setupOpenAIConnection(clientWs: WebSocket, OPENAI_API_KEY: string) {
 
 	// Handle OpenAI connection open
 	openaiWs.on('open', () => {
-		console.log('Connected to OpenAI Realtime API');
+		console.log('Connected to OpenAI Realtime API for repository:', repository);
 
 		// Load GitHub Issue context
 		const githubIssueContext = readFileSync(
@@ -88,8 +88,11 @@ function setupOpenAIConnection(clientWs: WebSocket, OPENAI_API_KEY: string) {
 			'utf-8'
 		);
 
-		// Build instructions with GitHub Issue Chatbot context
-		const instructions = GITHUB_ISSUE_INSTRUCTIONS.replace('{{CONTEXT}}', githubIssueContext);
+		// Build instructions with GitHub Issue Chatbot context and repository info
+		let instructions = GITHUB_ISSUE_INSTRUCTIONS.replace('{{CONTEXT}}', githubIssueContext);
+
+		// Add repository context to instructions
+		instructions = `CURRENT REPOSITORY: ${repository}\n\n${instructions}\n\nIMPORTANT: You are currently working with the repository "${repository}". When creating issues, always mention this repository name and create issues for this repository.`;
 
 		// Send session configuration
 		const sessionConfig = {
@@ -127,7 +130,10 @@ function setupOpenAIConnection(clientWs: WebSocket, OPENAI_API_KEY: string) {
 	openaiWs.on('close', (code, reason) => {
 		console.log('OpenAI connection closed:', code, reason.toString());
 		if (clientWs.readyState === WebSocket.OPEN) {
-			clientWs.close(code, reason.toString());
+			// Use 1000 (normal closure) if code is invalid or reserved (1005, 1006, 1015)
+			const reservedCodes = [1005, 1006, 1015];
+			const closeCode = typeof code === 'number' && code >= 1000 && code <= 4999 && !reservedCodes.includes(code) ? code : 1000;
+			clientWs.close(closeCode, reason.toString());
 		}
 	});
 
@@ -135,7 +141,10 @@ function setupOpenAIConnection(clientWs: WebSocket, OPENAI_API_KEY: string) {
 	clientWs.on('close', (code, reason) => {
 		console.log('Client connection closed:', code, reason.toString());
 		if (openaiWs.readyState === WebSocket.OPEN) {
-			openaiWs.close(code, reason.toString());
+			// Use 1000 (normal closure) if code is invalid or reserved (1005, 1006, 1015)
+			const reservedCodes = [1005, 1006, 1015];
+			const closeCode = typeof code === 'number' && code >= 1000 && code <= 4999 && !reservedCodes.includes(code) ? code : 1000;
+			openaiWs.close(closeCode, reason.toString());
 		}
 	});
 }
@@ -180,7 +189,7 @@ export function voiceWebSocketPlugin(): Plugin {
 
 				wss.handleUpgrade(request, socket, head, (ws) => {
 					console.log('Client connected to voice WebSocket for repository:', repository);
-					setupOpenAIConnection(ws, OPENAI_API_KEY);
+					setupOpenAIConnection(ws, OPENAI_API_KEY, repository);
 				});
 			});
 		}

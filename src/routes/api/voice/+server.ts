@@ -20,7 +20,13 @@ const GITHUB_ASSISTANT_SYSTEM_PROMPT = `You are Apollo, an AI assistant for GitH
 
 {{LEGACY_CONTEXT}}
 
-Important: When users ask you to perform GitHub operations (create issues, search code, etc.), you should naturally guide them through the process in conversation. The actual API calls will be made through the application interface based on user confirmation.`;
+CRITICAL INSTRUCTIONS:
+- You have DIRECT ACCESS to GitHub API tools and MUST use them when users request actions
+- When a user asks you to perform an action (create issue, search code, list issues, etc.), YOU MUST CALL THE APPROPRIATE TOOL IMMEDIATELY
+- Do NOT just describe what you could do - ACTUALLY USE THE TOOLS
+- After calling a tool and getting results, present them to the user in a helpful, conversational way
+- The repository context is ALREADY SET - you are working with a specific repository and have full permissions to act on it
+- Tools available: get_repository_summary, list_issues, create_issue, search_code, add_issue_comment, update_issue`;
 
 async function setupOpenAIConnection(
 	clientWs: any,
@@ -49,12 +55,24 @@ async function setupOpenAIConnection(
 	openaiWs.addEventListener('message', async (event: any) => {
 		const message = JSON.parse(event.data);
 
-		// Handle function/tool calls
-		if (message.type === 'response.function_call_arguments.done') {
-			const functionName = message.name;
-			const args = JSON.parse(message.arguments || '{}');
+		// Log all message types for debugging (except audio data)
+		if (message.type && !message.type.includes('audio')) {
+			console.log('OpenAI message type:', message.type);
+		}
 
-			console.log('Tool call:', functionName, args);
+		// Handle function/tool calls - check for the correct event type from OpenAI Realtime API
+		// The event is response.output_item.added when a function call is added
+		// Then response.output_item.done when it's complete
+		if (message.type === 'response.output_item.added' && message.item?.type === 'function_call') {
+			console.log('Function call item added:', message.item);
+		}
+
+		if (message.type === 'response.output_item.done' && message.item?.type === 'function_call') {
+			const functionName = message.item.name;
+			const args = JSON.parse(message.item.arguments || '{}');
+			const callId = message.item.call_id;
+
+			console.log('Tool call executing:', functionName, args);
 
 			try {
 				let result: any = null;
@@ -124,7 +142,7 @@ async function setupOpenAIConnection(
 					type: 'conversation.item.create',
 					item: {
 						type: 'function_call_output',
-						call_id: message.call_id,
+						call_id: callId,
 						output: JSON.stringify(result)
 					}
 				};
@@ -139,13 +157,15 @@ async function setupOpenAIConnection(
 					type: 'conversation.item.create',
 					item: {
 						type: 'function_call_output',
-						call_id: message.call_id,
+						call_id: callId,
 						output: JSON.stringify({
 							error: error instanceof Error ? error.message : 'Unknown error'
 						})
 					}
 				};
 				openaiWs.send(JSON.stringify(errorOutput));
+				// Trigger response even on error
+				openaiWs.send(JSON.stringify({ type: 'response.create' }));
 			}
 		}
 
@@ -162,9 +182,12 @@ async function setupOpenAIConnection(
 		// Set repository context if repository is provided (without downloading contents)
 		let repoContext = '';
 		if (repository) {
-			repoContext = `You are currently working with the GitHub repository: ${repository}\n\n`;
-			repoContext +=
-				'You can help users plan and structure their GitHub issues, search code, and manage the repository.\n\n';
+			repoContext = `You are currently working with the GitHub repository: **${repository}**\n\n`;
+			repoContext += `IMPORTANT: You have access to GitHub API tools and can perform the following actions on the ${repository} repository:\n`;
+			repoContext += `- Get repository summary and information\n`;
+			repoContext += `- List, create, update, and comment on issues\n`;
+			repoContext += `- Search through the codebase\n\n`;
+			repoContext += `When users ask you to perform these actions, you should USE THE TOOLS AVAILABLE TO YOU to execute them directly. Don't just explain what could be done - actually do it!\n\n`;
 		} else {
 			repoContext =
 				'No repository is currently selected. You can still help users plan and structure their GitHub issues.\n\n';
@@ -292,7 +315,32 @@ async function setupOpenAIConnection(
 			}
 		};
 
+		console.log('Sending session config with', tools.length, 'tools for repository:', repository);
+		console.log('Instructions include:', instructions.substring(0, 200) + '...');
 		openaiWs.send(JSON.stringify(sessionConfig));
+
+		// Send initial context message about the repository
+		if (repository) {
+			setTimeout(() => {
+				const contextMessage = {
+					type: 'conversation.item.create',
+					item: {
+						type: 'message',
+						role: 'user',
+						content: [
+							{
+								type: 'input_text',
+								text: `I'm working on the ${repository} repository. Please introduce yourself and let me know what you can help me with.`
+							}
+						]
+					}
+				};
+				openaiWs.send(JSON.stringify(contextMessage));
+
+				// Trigger a response to the context message
+				openaiWs.send(JSON.stringify({ type: 'response.create' }));
+			}, 500);
+		}
 	});
 
 	// Handle errors
@@ -307,7 +355,10 @@ async function setupOpenAIConnection(
 	openaiWs.addEventListener('close', (event: any) => {
 		console.log('OpenAI connection closed:', event.code, event.reason);
 		if (clientWs.readyState === WebSocket.OPEN) {
-			clientWs.close(event.code, event.reason);
+			// Use a valid close code (1000 = normal closure, or 1001-1003 for other cases)
+			// Don't use reserved codes like 1005, 1006, etc.
+			const closeCode = event.code >= 1000 && event.code <= 1003 ? event.code : 1000;
+			clientWs.close(closeCode, event.reason || 'Connection closed');
 		}
 	});
 
@@ -315,7 +366,9 @@ async function setupOpenAIConnection(
 	clientWs.addEventListener('close', (event: any) => {
 		console.log('Client connection closed:', event.code, event.reason);
 		if (openaiWs.readyState === WebSocket.OPEN) {
-			openaiWs.close(event.code, event.reason);
+			// Use a valid close code
+			const closeCode = event.code >= 1000 && event.code <= 1003 ? event.code : 1000;
+			openaiWs.close(closeCode, event.reason || 'Connection closed');
 		}
 	});
 }
@@ -353,6 +406,7 @@ export const GET: RequestHandler = async ({ request, platform, url, locals }) =>
 
 	// Only setup OpenAI connection if repository is selected
 	if (repository) {
+		console.log('Client connected to voice WebSocket for repository:', repository);
 		setupOpenAIConnection(server, OPENAI_API_KEY, repository, accessToken);
 	} else {
 		// Send error message immediately since WebSocket is already accepted
