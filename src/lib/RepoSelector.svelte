@@ -351,13 +351,79 @@
 {/if}
 
 <style>
+	:global([data-theme='light']) {
+		--modal-backdrop: rgba(0, 0, 0, 0.5);
+		--modal-bg: #ffffff;
+		--modal-border: #e5e5e5;
+		--modal-text: #1a1a1a;
+		--modal-text-secondary: #666666;
+		--modal-text-muted: #999999;
+		--modal-input-bg: #f9fafb;
+		--modal-input-border: #d1d5db;
+		--modal-input-focus: #667eea;
+		--modal-button-hover: #f3f4f6;
+		--modal-error-bg: #fef2f2;
+		--modal-error-text: #dc2626;
+		--modal-error-border: #dc2626;
+		--modal-loading-spinner: #667eea;
+		--modal-loading-track: #e5e5e5;
+		--modal-info-bg: #eff6ff;
+		--modal-info-border: #93c5fd;
+		--modal-info-text: #1e40af;
+		--modal-repo-item-bg: #ffffff;
+		--modal-repo-item-hover: #f9fafb;
+		--modal-repo-item-active: #f3f4f6;
+		--modal-repo-list-bg: #f9fafb;
+		--modal-repo-list-border: #e5e5e5;
+		--modal-badge-private-bg: #fef3c7;
+		--modal-badge-private-text: #92400e;
+		--modal-badge-org-bg: #dbeafe;
+		--modal-badge-org-text: #1e40af;
+		--modal-count-bg: #ffffff;
+		--modal-link-text: #667eea;
+		--modal-link-hover: #5568d3;
+	}
+
+	:global([data-theme='dark']) {
+		--modal-backdrop: rgba(0, 0, 0, 0.85);
+		--modal-bg: #111111;
+		--modal-border: #222222;
+		--modal-text: #e5e5e5;
+		--modal-text-secondary: #999999;
+		--modal-text-muted: #666666;
+		--modal-input-bg: #1a1a1a;
+		--modal-input-border: #2a2a2a;
+		--modal-input-focus: #667eea;
+		--modal-button-hover: #2a2a2a;
+		--modal-error-bg: #2a1515;
+		--modal-error-text: #ff6b6b;
+		--modal-error-border: #dc2626;
+		--modal-loading-spinner: #667eea;
+		--modal-loading-track: #2a2a2a;
+		--modal-info-bg: #1a2332;
+		--modal-info-border: #2d3f5f;
+		--modal-info-text: #7fb3ff;
+		--modal-repo-item-bg: #0a0a0a;
+		--modal-repo-item-hover: #1a1a1a;
+		--modal-repo-item-active: #252525;
+		--modal-repo-list-bg: #0a0a0a;
+		--modal-repo-list-border: #2a2a2a;
+		--modal-badge-private-bg: #3a2f1a;
+		--modal-badge-private-text: #fbbf24;
+		--modal-badge-org-bg: #1a2332;
+		--modal-badge-org-text: #7fb3ff;
+		--modal-count-bg: #0f0f0f;
+		--modal-link-text: #8b9aff;
+		--modal-link-hover: #a8b3ff;
+	}
+
 	.modal-backdrop {
 		position: fixed;
 		top: 0;
 		left: 0;
 		right: 0;
 		bottom: 0;
-		background: rgba(0, 0, 0, 0.85);
+		background: var(--modal-backdrop);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -366,8 +432,8 @@
 	}
 
 	.modal-content {
-		background: #111111;
-		border: 1px solid #222222;
+		background: var(--modal-bg);
+		border: 1px solid var(--modal-border);
 		border-radius: 1rem;
 		padding: 2rem;
 		max-width: 600px;
@@ -390,7 +456,7 @@
 		background: none;
 		border: none;
 		font-size: 2rem;
-		color: #666666;
+		color: var(--modal-text-muted);
 		cursor: pointer;
 		padding: 0;
 		line-height: 1;
@@ -398,18 +464,18 @@
 	}
 
 	.close-btn:hover {
-		color: #999999;
+		color: var(--modal-text-secondary);
 	}
 
 	h2 {
 		font-size: 1.75rem;
 		font-weight: 700;
-		color: #e5e5e5;
+		color: var(--modal-text);
 		margin: 0;
 	}
 
 	.modal-description {
-		color: #999999;
+		color: var(--modal-text-secondary);
 		margin-bottom: 1.5rem;
 		line-height: 1.5;
 	}
@@ -422,46 +488,45 @@
 		display: block;
 		font-weight: 600;
 		margin-bottom: 0.5rem;
-		color: #e5e5e5;
+		color: var(--modal-text);
 	}
 
 	.repo-input {
 		width: 100%;
 		padding: 0.75rem 1rem;
-		border: 2px solid #2a2a2a;
+		border: 2px solid var(--modal-input-border);
 		border-radius: 0.5rem;
 		font-size: 1rem;
 		transition: all 0.2s;
 		font-family: 'Monaco', 'Courier New', monospace;
-		background: #1a1a1a;
-		color: #e5e5e5;
+		background: var(--modal-input-bg);
+		color: var(--modal-text);
 	}
 
 	.repo-input:focus {
 		outline: none;
-		border-color: #667eea;
+		border-color: var(--modal-input-focus);
 		box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
 	}
 
 	.repo-input:disabled {
-		background: #0f0f0f;
-		cursor: not-allowed;
 		opacity: 0.6;
+		cursor: not-allowed;
 	}
 
 	.input-help {
 		display: block;
 		font-size: 0.875rem;
-		color: #666666;
+		color: var(--modal-text-muted);
 		margin-top: 0.375rem;
 	}
 
 	.error-message {
-		background: #2a1515;
-		color: #ff6b6b;
+		background: var(--modal-error-bg);
+		color: var(--modal-error-text);
 		padding: 0.75rem 1rem;
 		border-radius: 0.5rem;
-		border-left: 4px solid #dc2626;
+		border-left: 4px solid var(--modal-error-border);
 		margin-bottom: 1rem;
 		font-size: 0.9rem;
 	}
@@ -498,13 +563,13 @@
 	}
 
 	.btn-secondary {
-		background: #1a1a1a;
+		background: var(--modal-input-bg);
 		color: #667eea;
 		border: 2px solid #667eea;
 	}
 
 	.btn-secondary:hover:not(:disabled) {
-		background: #2a2a2a;
+		background: var(--modal-button-hover);
 	}
 
 	.loading-state {
@@ -516,8 +581,8 @@
 		width: 40px;
 		height: 40px;
 		margin: 0 auto 1rem;
-		border: 4px solid #2a2a2a;
-		border-top-color: #667eea;
+		border: 4px solid var(--modal-loading-track);
+		border-top-color: var(--modal-loading-spinner);
 		border-radius: 50%;
 		animation: spin 0.8s linear infinite;
 	}
@@ -529,13 +594,13 @@
 	}
 
 	.loading-state p {
-		color: #999999;
+		color: var(--modal-text-secondary);
 		margin: 0;
 	}
 
 	.loading-subtext {
 		font-size: 0.875rem;
-		color: #666666;
+		color: var(--modal-text-muted);
 		margin-top: 0.5rem !important;
 	}
 
@@ -551,15 +616,15 @@
 	}
 
 	.info-banner {
-		background: #1a2332;
-		border: 1px solid #2d3f5f;
+		background: var(--modal-info-bg);
+		border: 1px solid var(--modal-info-border);
 		border-radius: 0.5rem;
 		padding: 0.75rem 1rem;
 		display: flex;
 		align-items: flex-start;
 		gap: 0.5rem;
 		font-size: 0.875rem;
-		color: #7fb3ff;
+		color: var(--modal-info-text);
 		line-height: 1.5;
 		flex: 1;
 	}
@@ -599,35 +664,35 @@
 	.search-input {
 		width: 100%;
 		padding: 0.75rem 1rem;
-		border: 2px solid #2a2a2a;
+		border: 2px solid var(--modal-input-border);
 		border-radius: 0.5rem;
 		font-size: 1rem;
 		transition: all 0.2s;
-		background: #1a1a1a;
-		color: #e5e5e5;
+		background: var(--modal-input-bg);
+		color: var(--modal-text);
 	}
 
 	.search-input:focus {
 		outline: none;
-		border-color: #667eea;
+		border-color: var(--modal-input-focus);
 		box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
 	}
 
 	.repo-list {
 		max-height: 400px;
 		overflow-y: auto;
-		border: 2px solid #2a2a2a;
+		border: 2px solid var(--modal-repo-list-border);
 		border-radius: 0.5rem;
 		margin-bottom: 1rem;
-		background: #0a0a0a;
+		background: var(--modal-repo-list-bg);
 	}
 
 	.repo-item {
 		width: 100%;
 		padding: 1rem;
 		border: none;
-		border-bottom: 1px solid #2a2a2a;
-		background: #0a0a0a;
+		border-bottom: 1px solid var(--modal-repo-list-border);
+		background: var(--modal-repo-item-bg);
 		text-align: left;
 		cursor: pointer;
 		transition: background 0.2s;
@@ -638,11 +703,11 @@
 	}
 
 	.repo-item:hover {
-		background: #1a1a1a;
+		background: var(--modal-repo-item-hover);
 	}
 
 	.repo-item:active {
-		background: #252525;
+		background: var(--modal-repo-item-active);
 	}
 
 	.repo-item-header {
@@ -654,7 +719,7 @@
 
 	.repo-name {
 		font-weight: 600;
-		color: #e5e5e5;
+		color: var(--modal-text);
 		font-family: 'Monaco', 'Courier New', monospace;
 		font-size: 0.95rem;
 	}
@@ -667,17 +732,17 @@
 	}
 
 	.badge.private {
-		background: #3a2f1a;
-		color: #fbbf24;
+		background: var(--modal-badge-private-bg);
+		color: var(--modal-badge-private-text);
 	}
 
 	.badge.organization {
-		background: #1a2332;
-		color: #7fb3ff;
+		background: var(--modal-badge-org-bg);
+		color: var(--modal-badge-org-text);
 	}
 
 	.repo-description {
-		color: #999999;
+		color: var(--modal-text-secondary);
 		font-size: 0.875rem;
 		margin: 0;
 		line-height: 1.4;
@@ -692,22 +757,22 @@
 	.no-results {
 		padding: 2rem;
 		text-align: center;
-		color: #666666;
+		color: var(--modal-text-muted);
 	}
 
 	.repo-count {
 		padding: 0.75rem 1rem;
 		text-align: center;
-		color: #999999;
+		color: var(--modal-text-secondary);
 		font-size: 0.875rem;
-		border-top: 1px solid #2a2a2a;
-		background: #0f0f0f;
+		border-top: 1px solid var(--modal-repo-list-border);
+		background: var(--modal-count-bg);
 	}
 
 	.link-btn {
 		background: none;
 		border: none;
-		color: #8b9aff;
+		color: var(--modal-link-text);
 		font-weight: 600;
 		cursor: pointer;
 		padding: 0.5rem;
@@ -717,7 +782,7 @@
 	}
 
 	.link-btn:hover {
-		color: #a8b3ff;
+		color: var(--modal-link-hover);
 		text-decoration: underline;
 	}
 </style>

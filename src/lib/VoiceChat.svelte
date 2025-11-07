@@ -2,6 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import MarkdownRenderer from './MarkdownRenderer.svelte';
 	import { signIn, signOut } from '@auth/sveltekit/client';
+	import ThemeToggle from './ThemeToggle.svelte';
 
 	// Accept repository as a prop
 	let {
@@ -773,6 +774,10 @@
 
 					{#if showUserMenu}
 						<div class="user-dropdown">
+							<div class="dropdown-item theme-toggle-item">
+								<span>Theme</span>
+								<ThemeToggle />
+							</div>
 							<button
 								onclick={() => {
 									signOut();
@@ -1186,6 +1191,15 @@
 
 	.dropdown-item svg {
 		flex-shrink: 0;
+	}
+
+	.dropdown-item.theme-toggle-item {
+		justify-content: space-between;
+		cursor: default;
+	}
+
+	.dropdown-item.theme-toggle-item:hover {
+		background: transparent;
 	}
 
 	.login-btn {
