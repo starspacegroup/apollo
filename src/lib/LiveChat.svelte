@@ -1039,6 +1039,10 @@
 		goto(`/c/${session.id}`);
 	}
 
+	function toggleSidebar() {
+		sidebarCollapsed = !sidebarCollapsed;
+	}
+
 	onDestroy(() => {
 		disconnect();
 	});
@@ -1061,6 +1065,17 @@
 		<!-- Top Navigation Bar -->
 		<nav class="top-nav">
 			<div class="nav-left">
+				<!-- Hamburger menu for mobile -->
+				{#if session?.user}
+					<button class="hamburger-btn" onclick={toggleSidebar} aria-label="Toggle sidebar">
+						<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<line x1="3" y1="12" x2="21" y2="12"></line>
+							<line x1="3" y1="6" x2="21" y2="6"></line>
+							<line x1="3" y1="18" x2="21" y2="18"></line>
+						</svg>
+					</button>
+				{/if}
+				
 				{#if session?.user}
 					{#if repository}
 						<button onclick={changeRepo} class="repo-badge connected" title="Connected to {repository}\nClick to change repository">
@@ -1483,6 +1498,36 @@
 		display: flex;
 		align-items: center;
 		gap: 1rem;
+	}
+
+	/* Hamburger menu button - only visible on mobile */
+	.hamburger-btn {
+		display: none;
+		align-items: center;
+		justify-content: center;
+		width: 40px;
+		height: 40px;
+		padding: 0;
+		background: transparent;
+		border: none;
+		color: #e5e5e5;
+		cursor: pointer;
+		border-radius: 0.5rem;
+		transition: all 0.2s;
+	}
+
+	.hamburger-btn:hover {
+		background: #2a2a2a;
+	}
+
+	.hamburger-btn:active {
+		background: #333;
+	}
+
+	@media (max-width: 768px) {
+		.hamburger-btn {
+			display: flex;
+		}
 	}
 
 	.repo-badge {

@@ -30,8 +30,8 @@
 	onMount(() => {
 		const savedState = localStorage.getItem('sidebarCollapsed');
 		
-		// On mobile, default to collapsed unless explicitly expanded
-		if (window.innerWidth <= 480) {
+		// On mobile/tablet, default to collapsed unless explicitly expanded
+		if (window.innerWidth <= 768) {
 			isCollapsed = savedState === 'false' ? false : true;
 		} else {
 			// On desktop, use saved state or default to expanded
@@ -41,7 +41,7 @@
 		// Add keyboard listener for ESC key on mobile and Ctrl+K for command palette
 		const handleKeyDown = (e: KeyboardEvent) => {
 			// Escape key on mobile
-			if (e.key === 'Escape' && !isCollapsed && window.innerWidth <= 480) {
+			if (e.key === 'Escape' && !isCollapsed && window.innerWidth <= 768) {
 				toggleCollapsed();
 			}
 			
@@ -831,8 +831,15 @@
 			top: 0;
 			z-index: 100;
 			box-shadow: 4px 0 12px rgba(0, 0, 0, 0.3);
+			transition: transform 0.3s ease;
 		}
 
+		.sessions-sidebar.collapsed {
+			transform: translateX(-100%);
+			width: 280px; /* Keep full width on mobile, just hide it */
+		}
+
+		/* Show backdrop on mobile when sidebar is open (not collapsed) */
 		.sidebar-backdrop {
 			display: block;
 			position: fixed;
