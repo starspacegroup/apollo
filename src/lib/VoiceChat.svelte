@@ -660,6 +660,12 @@
 	function addTranscript(role: string, text: string) {
 		transcript = [...transcript, { role, text }];
 		
+		// Ensure we have an active session before adding message
+		if (!$currentSession && repository) {
+			console.log('No active session found, creating one before adding message');
+			sessionStore.createSession(repository);
+		}
+		
 		// Sync to session store
 		const message: ChatMessage = {
 			role: role as 'user' | 'assistant' | 'system',
@@ -686,6 +692,12 @@
 
 		const message = textMessage.trim();
 		textMessage = '';
+
+		// Ensure we have an active session - create one if needed
+		if (!$currentSession && repository) {
+			console.log('No active session when sending message, creating new session');
+			sessionStore.createSession(repository);
+		}
 
 		// Connect WebSocket if not already connected
 		if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -800,7 +812,7 @@
 		}
 
 		// Create a new session for current repository
-		sessionStore.createSession(repository);
+		const newSessionId = sessionStore.createSession(repository);
 		
 		// Clear transcript to start fresh
 		transcript = [];
@@ -808,8 +820,11 @@
 		// Clear any existing conversation state
 		if (ws && ws.readyState === WebSocket.OPEN) {
 			// Could send a clear conversation command if needed
-			console.log('Started new session for:', repository);
+			console.log('Started new session:', newSessionId, 'for repository:', repository);
 		}
+		
+		// Session will appear in history once the first message is added
+		console.log('New session created, will appear in history after first message');
 	}
 
 	function handleSessionSelect(session: ChatSession) {

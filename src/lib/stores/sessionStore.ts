@@ -316,7 +316,10 @@ export const currentSession = derived(sessionStore, ($sessionStore) => {
 });
 
 export const allSessions = derived(sessionStore, ($sessionStore) => {
-  return [...$sessionStore.sessions].sort((a, b) => b.updatedAt - a.updatedAt);
+  // Filter out sessions with no messages (don't show empty sessions in history)
+  return [...$sessionStore.sessions]
+    .filter((s) => s.messages.length > 0)
+    .sort((a, b) => b.updatedAt - a.updatedAt);
 });
 
 export const currentSessionMessages = derived(currentSession, ($currentSession) => {
