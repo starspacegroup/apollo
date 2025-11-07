@@ -5,9 +5,11 @@ const THEME_STORAGE_KEY = 'theme_preference';
 
 export type Theme = 'light' | 'dark';
 
+const DEFAULT_THEME: Theme = 'dark';
+
 function createThemeStore() {
 	// Get initial value from localStorage or system preference
-	let initialValue: Theme = 'dark'; // Default to dark
+	let initialValue: Theme = DEFAULT_THEME;
 	if (browser) {
 		try {
 			const stored = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null;
@@ -28,7 +30,7 @@ function createThemeStore() {
 	return {
 		subscribe,
 		get(): Theme {
-			if (!browser) return 'dark';
+			if (!browser) return DEFAULT_THEME;
 			try {
 				const stored = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null;
 				if (stored === 'light' || stored === 'dark') {

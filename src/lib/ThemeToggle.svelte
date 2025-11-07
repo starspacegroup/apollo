@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { themeStore } from './stores/themeStore';
+	import { themeStore, type Theme } from './stores/themeStore';
 
-	let theme = $state<'light' | 'dark'>('dark');
+	let theme = $state<Theme>('dark');
 
-	// Subscribe to theme changes
+	// Subscribe to theme changes using $effect
 	$effect(() => {
+		theme = themeStore.get();
 		const unsubscribe = themeStore.subscribe((value) => {
 			theme = value;
 		});

@@ -510,8 +510,9 @@
 	}
 
 	.repo-input:disabled {
-		opacity: 0.6;
+		opacity: 0.5;
 		cursor: not-allowed;
+		filter: brightness(0.8);
 	}
 
 	.input-help {
