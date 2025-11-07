@@ -12,6 +12,7 @@ export interface Message {
  * Generate a unique session ID
  */
 export function generateSessionId(): string {
+	// Extract 9 random characters from base36 string (skipping '0.' prefix)
 	return `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 }
 

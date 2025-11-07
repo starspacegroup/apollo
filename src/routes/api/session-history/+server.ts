@@ -87,6 +87,15 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 			throw error(400, 'Invalid role. Must be user, assistant, or system');
 		}
 
+		// Validate metadata if provided (max 10KB to prevent database issues)
+		let metadataJson: string | undefined;
+		if (metadata) {
+			metadataJson = JSON.stringify(metadata);
+			if (metadataJson.length > 10000) {
+				throw error(400, 'Metadata too large (max 10KB)');
+			}
+		}
+
 		// Create service
 		const sessionHistoryService = createSessionHistoryService(db);
 
@@ -99,7 +108,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 			session_id,
 			role: role as 'user' | 'assistant' | 'system',
 			content,
-			metadata: metadata ? JSON.stringify(metadata) : undefined
+			metadata: metadataJson
 		});
 
 		return json({
