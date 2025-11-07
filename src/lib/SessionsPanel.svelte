@@ -7,11 +7,13 @@
 	let {
 		onSessionSelect = (session: ChatSession) => {},
 		onNewSession = () => {},
+		onStartVoice = () => {},
 		isCollapsed = $bindable(false),
 		session = null
 	}: {
 		onSessionSelect?: (session: ChatSession) => void;
 		onNewSession?: () => void;
+		onStartVoice?: () => void;
 		isCollapsed?: boolean;
 		session?: any;
 	} = $props();
@@ -190,6 +192,10 @@
 		if (navId === 'chat') {
 			// Start a new chat session
 			handleNewSession();
+		} else if (navId === 'voice') {
+			// Start a new session and activate voice mode
+			handleNewSession();
+			onStartVoice();
 		}
 		
 		console.log('Navigation clicked:', navId);

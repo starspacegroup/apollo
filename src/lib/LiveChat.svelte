@@ -163,14 +163,46 @@
 			const wsUrl = `${protocol}//${window.location.host}/api/voice?repo=${encodeURIComponent(repository)}`;
 			ws = new WebSocket(wsUrl);
 
-			ws.onopen = () => {
-				isConnected = true;
-				connectedRepository = repository; // Mark which repository we're connected to
-				console.log('Connected to AI chat for repository:', repository);
-				// Disable server VAD by default (enable only when voice chat starts)
-				setTimeout(() => disableServerVAD(), 500);
+			// Wait for the connection to open or fail
+			await new Promise<void>((resolve, reject) => {
+				const timeout = setTimeout(() => {
+					reject(new Error('Connection timeout'));
+				}, 10000); // 10 second timeout
+
+				const handleOpen = () => {
+					clearTimeout(timeout);
+					isConnected = true;
+					connectedRepository = repository; // Mark which repository we're connected to
+					console.log('Connected to AI chat for repository:', repository);
+					// Disable server VAD by default (enable only when voice chat starts)
+					setTimeout(() => disableServerVAD(), 500);
+					resolve();
+				};
+
+				const handleError = (event: Event) => {
+					clearTimeout(timeout);
+					console.error('WebSocket connection error:', event);
+					// Only show error if not an intentional disconnect or repository switch
+					if (!isIntentionalDisconnect && repository === connectedRepository) {
+						error = 'Connection error occurred';
+					}
+					reject(new Error('WebSocket connection failed'));
+				};
+
+				ws!.addEventListener('open', handleOpen, { once: true });
+				ws!.addEventListener('error', handleError, { once: true });
+			});
+
+			// Now set up the permanent message and error handlers after connection is established
+			ws.onerror = (event) => {
+				console.error('WebSocket error:', event);
+				// Only show error if not an intentional disconnect or repository switch
+				if (!isIntentionalDisconnect && repository === connectedRepository) {
+					error = 'Connection error occurred';
+				}
 			};
 
+			// Now set up the message handlers after connection is established
 			ws.onmessage = async (event) => {
 				const data = JSON.parse(event.data);
 				console.log('WebSocket message:', data.type, data);
@@ -354,14 +386,6 @@
 				}
 			};
 
-			ws.onerror = (event) => {
-				console.error('WebSocket error:', event);
-				// Only show error if not an intentional disconnect or repository switch
-				if (!isIntentionalDisconnect && repository === connectedRepository) {
-					error = 'Connection error occurred';
-				}
-			};
-
 			ws.onclose = (event) => {
 				isConnected = false;
 				isRecording = false;
@@ -388,36 +412,44 @@
 	function disableServerVAD() {
 		if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
-		// Disable server-side voice activity detection for text mode
-		console.log('Disabling server VAD for text mode');
-		ws.send(
-			JSON.stringify({
-				type: 'session.update',
-				session: {
-					turn_detection: null
-				}
-			})
-		);
+		try {
+			// Disable server-side voice activity detection for text mode
+			console.log('Disabling server VAD for text mode');
+			ws.send(
+				JSON.stringify({
+					type: 'session.update',
+					session: {
+						turn_detection: null
+					}
+				})
+			);
+		} catch (e) {
+			console.warn('Failed to disable server VAD:', e);
+		}
 	}
 
 	function enableServerVAD() {
 		if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
-		// Enable server-side voice activity detection for voice mode
-		console.log('Enabling server VAD for voice mode');
-		ws.send(
-			JSON.stringify({
-				type: 'session.update',
-				session: {
-					turn_detection: {
-						type: 'server_vad',
-						threshold: 0.6,
-						prefix_padding_ms: 300,
-						silence_duration_ms: 800
+		try {
+			// Enable server-side voice activity detection for voice mode
+			console.log('Enabling server VAD for voice mode');
+			ws.send(
+				JSON.stringify({
+					type: 'session.update',
+					session: {
+						turn_detection: {
+							type: 'server_vad',
+							threshold: 0.6,
+							prefix_padding_ms: 300,
+							silence_duration_ms: 800
+						}
 					}
-				}
-			})
-		);
+				})
+			);
+		} catch (e) {
+			console.warn('Failed to enable server VAD:', e);
+		}
 	}
 
 	async function startVoiceChat() {
@@ -425,28 +457,76 @@
 			error = '';
 			isConnecting = true;
 
-			// Connect WebSocket if not already connected
-			await connectWebSocket();
+			// Clean up any existing voice session state first
+			if (isVoiceMode) {
+				console.log('Cleaning up existing voice session before starting new one');
+				stopRecording();
+				// Wait a bit for cleanup
+				await new Promise(resolve => setTimeout(resolve, 100));
+			}
+
+			// Cancel any ongoing audio and reset state
+			cancelCurrentAudio();
+			audioQueue = [];
+			isPlayingAudio = false;
+			nextPlaybackTime = 0;
+			isSpeaking = false;
+			shouldCancelAudio = false;
+			processingResponse = false;
+			currentResponseId = null;
+
+			// Connect WebSocket if not already connected (this now waits for connection)
+			if (!ws || ws.readyState !== WebSocket.OPEN) {
+				await connectWebSocket();
+			}
 
 			// Request microphone access
 			mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-			// Create audio context
+			// Always create a fresh audio context for each voice session
 			audioContext = new AudioContext({ sampleRate: 24000 });
+			console.log('Created new audio context for voice session');
 
-			// Wait for connection to be ready
+			// Connection is now guaranteed to be open
 			if (ws && ws.readyState === WebSocket.OPEN) {
+				// Clear any previous conversation state before enabling voice mode
+				console.log('Clearing conversation state before starting voice session');
+				ws.send(JSON.stringify({ 
+					type: 'input_audio_buffer.clear'
+				}));
+
 				isVoiceMode = true;
 				enableServerVAD();
 				startRecording();
 
-				// Show bounce animation after connecting
+				// Stop the bounce animation after connecting
 				isConnecting = false;
+			} else {
+				throw new Error('WebSocket connection not ready');
 			}
 		} catch (err) {
 			console.error('Error starting voice chat:', err);
 			error = err instanceof Error ? err.message : 'Failed to start voice chat';
 			isConnecting = false;
+			
+			// Clean up if we failed
+			if (mediaStream) {
+				mediaStream.getTracks().forEach(track => track.stop());
+				mediaStream = null;
+			}
+			if (audioContext) {
+				audioContext.close();
+				audioContext = null;
+			}
+		}
+	}
+
+	// Export function to allow parent components to start voice mode
+	export function activateVoiceMode() {
+		if (!isVoiceMode && repository) {
+			startVoiceChat();
+		} else if (!repository) {
+			console.warn('Cannot start voice mode: no repository selected');
 		}
 	}
 
@@ -494,18 +574,38 @@
 	}
 
 	function stopRecording() {
+		console.log('Stopping recording and cleaning up audio resources');
+		
+		// Disconnect and clean up audio processor
 		if (audioProcessor) {
-			audioProcessor.disconnect();
+			try {
+				audioProcessor.disconnect();
+				audioProcessor.onaudioprocess = null;
+			} catch (e) {
+				console.warn('Error disconnecting audio processor:', e);
+			}
 			audioProcessor = null;
 		}
 
+		// Stop all media stream tracks
 		if (mediaStream) {
-			mediaStream.getTracks().forEach((track) => track.stop());
+			mediaStream.getTracks().forEach((track) => {
+				track.stop();
+				console.log('Stopped media track:', track.kind);
+			});
 			mediaStream = null;
 		}
 
-		if (audioContext) {
-			audioContext.close();
+		// Close audio context and set to null for clean restart
+		if (audioContext && audioContext.state !== 'closed') {
+			audioContext.close().then(() => {
+				console.log('Audio context closed');
+				audioContext = null;
+			}).catch((e) => {
+				console.warn('Error closing audio context:', e);
+				audioContext = null;
+			});
+		} else {
 			audioContext = null;
 		}
 
@@ -772,15 +872,49 @@
 	}
 
 	function stopVoiceChat() {
-		// Only stop recording, not the WebSocket connection
+		console.log('Stopping voice chat');
+		
+		// Clear any errors from the voice session
+		error = '';
+		
+		// Cancel any ongoing audio playback
+		cancelCurrentAudio();
+		
+		// Stop recording and clean up media resources
 		stopRecording();
 
-		// Clear audio queue
+		// Clear audio queue and reset playback state
 		audioQueue = [];
 		isPlayingAudio = false;
 		nextPlaybackTime = 0;
 		isSpeaking = false;
 		isConnecting = false;
+		shouldCancelAudio = false;
+
+		// Cancel any ongoing response
+		if (processingResponse && ws && ws.readyState === WebSocket.OPEN) {
+			try {
+				console.log('Canceling ongoing response when stopping voice chat');
+				ws.send(JSON.stringify({ type: 'response.cancel' }));
+			} catch (e) {
+				console.warn('Failed to cancel response:', e);
+			}
+			processingResponse = false;
+			currentResponseId = null;
+		}
+
+		// Clear the conversation to reset the session state
+		if (ws && ws.readyState === WebSocket.OPEN) {
+			try {
+				console.log('Clearing input audio buffer');
+				// Only clear the input audio buffer, don't truncate conversation
+				ws.send(JSON.stringify({ 
+					type: 'input_audio_buffer.clear'
+				}));
+			} catch (e) {
+				console.warn('Failed to clear audio buffer:', e);
+			}
+		}
 
 		// Disable server VAD for text chat mode
 		disableServerVAD();
@@ -789,23 +923,36 @@
 	}
 
 	function disconnect() {
-		// Fully disconnect everything
+		console.log('Disconnecting and cleaning up all resources');
+		
+		// Cancel any ongoing audio and responses
+		cancelCurrentAudio();
+		
+		// Stop recording and clean up media resources
 		stopRecording();
 
+		// Close WebSocket connection
 		if (ws) {
-			ws.close();
+			isIntentionalDisconnect = true;
+			if (ws.readyState === WebSocket.OPEN) {
+				ws.close(1000, 'User disconnected');
+			}
 			ws = null;
 		}
 
-		// Clear audio queue
+		// Clear all audio and response state
 		audioQueue = [];
 		isPlayingAudio = false;
 		nextPlaybackTime = 0;
 		currentResponseId = null;
 		processingResponse = false;
+		shouldCancelAudio = false;
 
+		// Reset connection state
 		isConnected = false;
 		isSpeaking = false;
+		isVoiceMode = false;
+		isConnecting = false;
 	}
 
 	// Session handlers
@@ -871,6 +1018,7 @@
 		<SessionsPanel
 			onSessionSelect={handleSessionSelect}
 			onNewSession={handleNewSession}
+			onStartVoice={activateVoiceMode}
 			bind:isCollapsed={sidebarCollapsed}
 			{session}
 		/>
