@@ -351,39 +351,7 @@
 {/if}
 
 <style>
-	:global([data-theme='light']) {
-		--modal-backdrop: rgba(0, 0, 0, 0.5);
-		--modal-bg: #ffffff;
-		--modal-border: #e5e5e5;
-		--modal-text: #1a1a1a;
-		--modal-text-secondary: #666666;
-		--modal-text-muted: #999999;
-		--modal-input-bg: #f9fafb;
-		--modal-input-border: #d1d5db;
-		--modal-input-focus: #667eea;
-		--modal-button-hover: #f3f4f6;
-		--modal-error-bg: #fef2f2;
-		--modal-error-text: #dc2626;
-		--modal-error-border: #dc2626;
-		--modal-loading-spinner: #667eea;
-		--modal-loading-track: #e5e5e5;
-		--modal-info-bg: #eff6ff;
-		--modal-info-border: #93c5fd;
-		--modal-info-text: #1e40af;
-		--modal-repo-item-bg: #ffffff;
-		--modal-repo-item-hover: #f9fafb;
-		--modal-repo-item-active: #f3f4f6;
-		--modal-repo-list-bg: #f9fafb;
-		--modal-repo-list-border: #e5e5e5;
-		--modal-badge-private-bg: #fef3c7;
-		--modal-badge-private-text: #92400e;
-		--modal-badge-org-bg: #dbeafe;
-		--modal-badge-org-text: #1e40af;
-		--modal-count-bg: #ffffff;
-		--modal-link-text: #667eea;
-		--modal-link-hover: #5568d3;
-	}
-
+	/* Dark theme CSS variables */
 	:global([data-theme='dark']) {
 		--modal-backdrop: rgba(0, 0, 0, 0.85);
 		--modal-bg: #111111;

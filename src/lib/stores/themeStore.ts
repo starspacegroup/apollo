@@ -1,69 +1,19 @@
-import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 
-const THEME_STORAGE_KEY = 'theme_preference';
+// Always use dark theme - no toggling
+export type Theme = 'dark';
 
-export type Theme = 'light' | 'dark';
-
-const DEFAULT_THEME: Theme = 'dark';
+const THEME: Theme = 'dark';
 
 function createThemeStore() {
-	// Get initial value from localStorage or system preference
-	let initialValue: Theme = DEFAULT_THEME;
-	if (browser) {
-		try {
-			const stored = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null;
-			if (stored === 'light' || stored === 'dark') {
-				initialValue = stored;
-			} else {
-				// Detect system preference
-				const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-				initialValue = prefersDark ? 'dark' : 'light';
-			}
-		} catch (e) {
-			console.error('Failed to read theme from localStorage:', e);
-		}
-	}
-
-	const { subscribe, set } = writable<Theme>(initialValue);
-
 	return {
-		subscribe,
 		get(): Theme {
-			if (!browser) return DEFAULT_THEME;
-			try {
-				const stored = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null;
-				if (stored === 'light' || stored === 'dark') {
-					return stored;
-				}
-				// Fallback to system preference
-				const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-				return prefersDark ? 'dark' : 'light';
-			} catch (e) {
-				console.error('Failed to read theme from localStorage:', e);
-				return 'dark';
-			}
-		},
-		set(theme: Theme) {
-			if (!browser) return;
-			try {
-				localStorage.setItem(THEME_STORAGE_KEY, theme);
-				set(theme);
-				// Update document class for global theme
-				document.documentElement.setAttribute('data-theme', theme);
-			} catch (e) {
-				console.error('Failed to write theme to localStorage:', e);
-			}
-		},
-		toggle() {
-			const current = this.get();
-			this.set(current === 'light' ? 'dark' : 'light');
+			return THEME;
 		},
 		init() {
-			// Initialize theme on document
+			// Initialize dark theme on document
 			if (browser) {
-				const theme = this.get();
-				document.documentElement.setAttribute('data-theme', theme);
+				document.documentElement.setAttribute('data-theme', THEME);
 			}
 		}
 	};
