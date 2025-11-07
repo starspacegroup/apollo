@@ -934,21 +934,6 @@
 						</svg>
 					</div>
 					<h2>Connected to {repository}</h2>
-					{#if $currentSession}
-						<div class="session-info">
-							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<circle cx="12" cy="12" r="10"></circle>
-								<path d="M12 6v6l4 2"></path>
-							</svg>
-							<span>{$currentSession.title}</span>
-							<button class="new-chat-mini-btn" onclick={handleNewSession} title="Start New Chat">
-								<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-									<line x1="12" y1="5" x2="12" y2="19"></line>
-									<line x1="5" y1="12" x2="19" y2="12"></line>
-								</svg>
-							</button>
-						</div>
-					{/if}
 					<p class="welcome-description">I can help you with:</p>
 					<div class="capabilities-list">
 						<div class="capability-item">
@@ -1416,31 +1401,6 @@
 		margin-top: 1.5rem !important;
 		font-size: 0.875rem !important;
 		font-style: italic;
-	}
-
-	.session-info {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.75rem 1rem;
-		background: rgba(102, 126, 234, 0.1);
-		border: 1px solid rgba(102, 126, 234, 0.3);
-		border-radius: 0.5rem;
-		color: #e5e5e5;
-		font-size: 0.875rem;
-		margin-top: 1rem;
-	}
-
-	.session-info svg {
-		color: #667eea;
-		flex-shrink: 0;
-	}
-
-	.session-info span {
-		flex: 1;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
 	}
 
 	.new-chat-mini-btn {
