@@ -185,7 +185,13 @@
 
 	function handleNavClick(navId: string) {
 		activeNav = navId;
-		// You can add routing or view switching logic here
+		
+		// Handle navigation actions
+		if (navId === 'chat') {
+			// Start a new chat session
+			handleNewSession();
+		}
+		
 		console.log('Navigation clicked:', navId);
 	}
 

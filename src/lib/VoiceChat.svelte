@@ -48,6 +48,7 @@
 	let connectedRepository = $state(''); // Track which repository we're connected to
 	let isIntentionalDisconnect = false; // Track if disconnect is intentional (e.g., switching repos)
 	let sidebarCollapsed = $state(false); // Track sidebar collapsed state
+	let inputCentered = $state(true); // Track if input should be centered (true when no messages)
 
 	// Auto-scroll to bottom when transcript changes
 	$effect(() => {
@@ -94,6 +95,7 @@
 				}
 				connectedRepository = '';
 				transcript = [];
+				inputCentered = true; // Reset to centered when repository is cleared
 			}
 		}
 	});
@@ -118,6 +120,13 @@
 			// This is handled by addTranscript and updateTranscript functions
 			// which directly call sessionStore methods
 		}
+	});
+
+	// Update input position based on transcript and voice mode
+	$effect(() => {
+		// Center input when there are no messages and not in voice mode
+		// Move to bottom when there are messages OR voice mode is active
+		inputCentered = transcript.length === 0 && !isVoiceMode;
 	});
 
 	// Auto-connect on mount only if repository is selected
@@ -693,6 +702,11 @@
 		// Add user message to transcript immediately
 		addTranscript('user', message);
 
+		// Refocus the input field after sending
+		setTimeout(() => {
+			textInputRef?.focus();
+		}, 0);
+
 		// Cancel any ongoing response
 		if (processingResponse) {
 			console.log('Canceling response before sending text message');
@@ -897,7 +911,7 @@
 	</nav>
 
 	<!-- Main Chat Area -->
-	<div class="chat-area">
+	<div class="chat-area" class:input-centered={inputCentered}>
 		<div class="messages-container" bind:this={messagesContainerRef}>
 			{#if !repository}
 				<div class="welcome-state">
@@ -933,6 +947,111 @@
 						</svg>
 					</div>
 					<h2>Connected to {repository}</h2>
+					
+					<!-- Input field directly below "Connected to" -->
+					{#if transcript.length === 0}
+					<div class="welcome-input-wrapper">
+						<textarea
+							bind:this={textInputRef}
+							bind:value={textMessage}
+							onkeydown={handleKeyDown}
+							placeholder="Message Apollo..."
+							rows="1"
+							class="message-input"
+						></textarea>
+
+						<button
+							class="send-btn"
+							onclick={sendTextMessage}
+							disabled={!textMessage.trim()}
+							title="Send message"
+						>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								width="20"
+								height="20"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<line x1="22" y1="2" x2="11" y2="13"></line>
+								<polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+							</svg>
+						</button>
+
+						<button
+							class="voice-btn"
+							class:connecting={isConnecting}
+							class:recording={isVoiceMode && isRecording}
+							class:speaking={isSpeaking}
+							class:active={isVoiceMode}
+							onclick={isVoiceMode ? stopVoiceChat : startVoiceChat}
+							title={isVoiceMode ? 'Stop voice chat' : 'Start voice chat'}
+						>
+							<div class="waveform-icon">
+								{#if isVoiceMode}
+									<!-- Stop icon when active -->
+									<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+										<rect width="8" height="8" x="6" y="6" rx="1.5"></rect>
+									</svg>
+								{:else}
+									<!-- Custom 5-bar waveform icon -->
+									<svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+										<rect
+											class="bar bar-1"
+											x="3"
+											y="8"
+											width="2.5"
+											height="8"
+											rx="1.25"
+											fill="currentColor"
+										></rect>
+										<rect
+											class="bar bar-2"
+											x="7.5"
+											y="5"
+											width="2.5"
+											height="14"
+											rx="1.25"
+											fill="currentColor"
+										></rect>
+										<rect
+											class="bar bar-3"
+											x="12"
+											y="3"
+											width="2.5"
+											height="18"
+											rx="1.25"
+											fill="currentColor"
+										></rect>
+										<rect
+											class="bar bar-4"
+											x="16.5"
+											y="5"
+											width="2.5"
+											height="14"
+											rx="1.25"
+											fill="currentColor"
+										></rect>
+										<rect
+											class="bar bar-5"
+											x="21"
+											y="8"
+											width="2.5"
+											height="8"
+											rx="1.25"
+											fill="currentColor"
+										></rect>
+									</svg>
+								{/if}
+							</div>
+						</button>
+					</div>
+					{/if}
+					
 					<p class="welcome-description">I can help you with:</p>
 					<div class="capabilities-list">
 						<div class="capability-item">
@@ -981,135 +1100,135 @@
 		</div>
 	</div>
 
-	<!-- Bottom Input Area -->
-	<div class="input-area">
-		{#if error}
-			<div class="error-banner">
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					width="16"
-					height="16"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-				>
-					<circle cx="12" cy="12" r="10"></circle>
-					<line x1="12" y1="8" x2="12" y2="12"></line>
-					<line x1="12" y1="16" x2="12.01" y2="16"></line>
-				</svg>
-				{error}
-			</div>
-		{/if}
-
-		<div class="input-wrapper">
-			<div class="input-controls">
-				<textarea
-					bind:this={textInputRef}
-					bind:value={textMessage}
-					onkeydown={handleKeyDown}
-					placeholder={repository ? "Message Apollo..." : "Select a repository to start chatting"}
-					rows="1"
-					class="message-input"
-					disabled={!repository}
-				></textarea>
-
-				<button
-					class="send-btn"
-					onclick={sendTextMessage}
-					disabled={!textMessage.trim() || !repository}
-					title="Send message"
-				>
+	<!-- Bottom Input Area - Shows when there are messages -->
+	{#if transcript.length > 0 && repository}
+		<div class="bottom-input-area">
+			{#if error}
+				<div class="error-banner">
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						width="20"
-						height="20"
+						width="16"
+						height="16"
 						viewBox="0 0 24 24"
 						fill="none"
 						stroke="currentColor"
 						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
 					>
-						<line x1="22" y1="2" x2="11" y2="13"></line>
-						<polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+						<circle cx="12" cy="12" r="10"></circle>
+						<line x1="12" y1="8" x2="12" y2="12"></line>
+						<line x1="12" y1="16" x2="12.01" y2="16"></line>
 					</svg>
-				</button>
+					{error}
+				</div>
+			{/if}
 
-				<button
-					class="voice-btn"
-					class:connecting={isConnecting}
-					class:recording={isVoiceMode && isRecording}
-					class:speaking={isSpeaking}
-					class:active={isVoiceMode}
-					onclick={isVoiceMode ? stopVoiceChat : startVoiceChat}
-					disabled={!repository}
-					title={!repository ? 'Select a repository to use voice chat' : (isVoiceMode ? 'Stop voice chat' : 'Start voice chat')}
-				>
-					<div class="waveform-icon">
-						{#if isVoiceMode}
-							<!-- Stop icon when active -->
-							<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-								<rect width="8" height="8" x="6" y="6" rx="1.5"></rect>
-							</svg>
-						{:else}
-							<!-- Custom 5-bar waveform icon -->
-							<svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-								<rect
-									class="bar bar-1"
-									x="3"
-									y="8"
-									width="2.5"
-									height="8"
-									rx="1.25"
-									fill="currentColor"
-								></rect>
-								<rect
-									class="bar bar-2"
-									x="7.5"
-									y="5"
-									width="2.5"
-									height="14"
-									rx="1.25"
-									fill="currentColor"
-								></rect>
-								<rect
-									class="bar bar-3"
-									x="12"
-									y="3"
-									width="2.5"
-									height="18"
-									rx="1.25"
-									fill="currentColor"
-								></rect>
-								<rect
-									class="bar bar-4"
-									x="16.5"
-									y="5"
-									width="2.5"
-									height="14"
-									rx="1.25"
-									fill="currentColor"
-								></rect>
-								<rect
-									class="bar bar-5"
-									x="21"
-									y="8"
-									width="2.5"
-									height="8"
-									rx="1.25"
-									fill="currentColor"
-								></rect>
-							</svg>
+			<div class="input-wrapper">
+				<div class="input-controls">
+					<textarea
+						bind:this={textInputRef}
+						bind:value={textMessage}
+						onkeydown={handleKeyDown}
+						placeholder="Message Apollo..."
+						rows="1"
+						class="message-input"
+					></textarea>
+
+					<button
+						class="send-btn"
+						onclick={sendTextMessage}
+						disabled={!textMessage.trim()}
+						title="Send message"
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="20"
+							height="20"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<line x1="22" y1="2" x2="11" y2="13"></line>
+							<polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+						</svg>
+					</button>
+
+					<button
+						class="voice-btn"
+						class:connecting={isConnecting}
+						class:recording={isVoiceMode && isRecording}
+						class:speaking={isSpeaking}
+						class:active={isVoiceMode}
+						onclick={isVoiceMode ? stopVoiceChat : startVoiceChat}
+						title={isVoiceMode ? 'Stop voice chat' : 'Start voice chat'}
+					>
+						<div class="waveform-icon">
+							{#if isVoiceMode}
+								<!-- Stop icon when active -->
+								<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+									<rect width="8" height="8" x="6" y="6" rx="1.5"></rect>
+								</svg>
+							{:else}
+								<!-- Custom 5-bar waveform icon -->
+								<svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+									<rect
+										class="bar bar-1"
+										x="3"
+										y="8"
+										width="2.5"
+										height="8"
+										rx="1.25"
+										fill="currentColor"
+									></rect>
+									<rect
+										class="bar bar-2"
+										x="7.5"
+										y="5"
+										width="2.5"
+										height="14"
+										rx="1.25"
+										fill="currentColor"
+									></rect>
+									<rect
+										class="bar bar-3"
+										x="12"
+										y="3"
+										width="2.5"
+										height="18"
+										rx="1.25"
+										fill="currentColor"
+									></rect>
+									<rect
+										class="bar bar-4"
+										x="16.5"
+										y="5"
+										width="2.5"
+										height="14"
+										rx="1.25"
+										fill="currentColor"
+									></rect>
+									<rect
+										class="bar bar-5"
+										x="21"
+										y="8"
+										width="2.5"
+										height="8"
+										rx="1.25"
+										fill="currentColor"
+									></rect>
+								</svg>
+							{/if}
+						</div>
+						{#if isVoiceMode && isRecording}
+							<div class="pulse-ring"></div>
 						{/if}
-					</div>
-					{#if isVoiceMode && isRecording}
-						<div class="pulse-ring"></div>
-					{/if}
-				</button>
+					</button>
+				</div>
 			</div>
 		</div>
-	</div>
+	{/if}
 	</div>
 </div>
 
@@ -1298,6 +1417,11 @@
 		overflow: hidden;
 		display: flex;
 		flex-direction: column;
+		position: relative;
+	}
+
+	.chat-area.input-centered {
+		justify-content: center;
 	}
 
 	.messages-container {
@@ -1389,6 +1513,25 @@
 		margin-top: 1.5rem !important;
 		font-size: 0.875rem !important;
 		font-style: italic;
+	}
+
+	.welcome-input-wrapper {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		width: 100%;
+		max-width: 600px;
+		padding: 0.75rem 1rem;
+		background: #1a1a1a;
+		border: 1px solid #333333;
+		border-radius: 1.5rem;
+		transition: border-color 0.2s;
+		margin: 1rem 0;
+	}
+
+	.welcome-input-wrapper:focus-within {
+		border-color: #667eea;
+		box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
 	}
 
 	.new-chat-mini-btn {
@@ -1494,6 +1637,39 @@
 		padding-bottom: max(1rem, env(safe-area-inset-bottom));
 		padding-left: max(1rem, env(safe-area-inset-left));
 		padding-right: max(1rem, env(safe-area-inset-right));
+		transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+	}
+
+	.input-area.centered {
+		position: absolute;
+		bottom: 50%;
+		left: 0;
+		right: 0;
+		transform: translateY(50%);
+		background: transparent;
+		z-index: 10;
+	}
+
+	.bottom-input-area {
+		flex-shrink: 0;
+		padding: 1rem;
+		background: #0a0a0a;
+		/* Add safe area for mobile home indicator */
+		padding-bottom: max(1rem, env(safe-area-inset-bottom));
+		padding-left: max(1rem, env(safe-area-inset-left));
+		padding-right: max(1rem, env(safe-area-inset-right));
+		animation: slideToBottom 0.3s ease-out;
+	}
+
+	@keyframes slideToBottom {
+		from {
+			transform: translateY(-50vh);
+			opacity: 0.5;
+		}
+		to {
+			transform: translateY(0);
+			opacity: 1;
+		}
 	}
 
 	.error-banner {
