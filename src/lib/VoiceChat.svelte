@@ -14,6 +14,9 @@
 		changeRepo?: () => void;
 	} = $props();
 
+	// Extract repository name without org prefix
+	const repoName = $derived(repository ? repository.split('/').pop() || repository : '');
+
 	let ws: WebSocket | null = null;
 	let audioContext: AudioContext | null = null;
 	let mediaStream: MediaStream | null = null;
@@ -275,11 +278,16 @@
 				error = 'Connection error occurred';
 			};
 
-			ws.onclose = () => {
+			ws.onclose = (event) => {
 				isConnected = false;
 				isRecording = false;
 				isVoiceMode = false;
 				console.log('Disconnected from AI chat');
+				
+				// If connection was rejected due to authentication (401)
+				if (event.code === 1008 || event.reason?.includes('Authentication')) {
+					error = 'Authentication required. Please sign in.';
+				}
 			};
 		} catch (err) {
 			console.error('Error connecting:', err);
@@ -693,20 +701,11 @@
 		<div class="nav-left">
 			<h1 class="logo">Apollo</h1>
 			{#if session?.user && repository}
-				<button onclick={changeRepo} class="repo-badge" title="Change repository">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="16"
-						height="16"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
-						></path>
+				<button onclick={changeRepo} class="repo-badge" title={repository}>
+					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
 					</svg>
-					<span>{repository}</span>
+					<span>{repoName}</span>
 				</button>
 			{/if}
 		</div>
@@ -747,26 +746,16 @@
 			{/if}
 			{#if session?.user}
 				<div class="user-menu-container">
-					<button
-						class="user-pill"
-						onclick={() => (showUserMenu = !showUserMenu)}
-						title="User menu"
+					<button 
+						class="user-pill" 
+						onclick={() => showUserMenu = !showUserMenu}
+						title={session.user.name || session.user.username || 'User menu'}
 					>
 						{#if session.user.image}
 							<img src={session.user.image} alt={session.user.name || 'User'} class="user-avatar" />
 						{/if}
-						<span>{session.user.name || session.user.username}</span>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							width="14"
-							height="14"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							class="chevron"
-							class:open={showUserMenu}
-						>
+						<span class="user-name">{session.user.name || session.user.username}</span>
+						<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron" class:open={showUserMenu}>
 							<polyline points="6 9 12 15 18 9"></polyline>
 						</svg>
 					</button>
@@ -990,7 +979,8 @@
 		display: flex;
 		flex-direction: column;
 		height: 100vh;
-		height: 100dvh; /* Use dynamic viewport height for mobile */
+		/* Use dynamic viewport height on mobile to account for browser UI */
+		height: 100dvh;
 		width: 100%;
 		background: #0a0a0a;
 		color: #e5e5e5;
@@ -1003,11 +993,15 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding: 0.75rem 1.5rem;
+		padding: 0.75rem 1rem;
 		background: #111111;
 		border-bottom: 1px solid #222222;
 		height: 60px;
 		flex-shrink: 0;
+		/* Add safe area for notches */
+		padding-left: max(1rem, env(safe-area-inset-left));
+		padding-right: max(1rem, env(safe-area-inset-right));
+		padding-top: max(0.75rem, env(safe-area-inset-top));
 	}
 
 	.nav-left {
@@ -1346,9 +1340,13 @@
 	/* Input Area */
 	.input-area {
 		flex-shrink: 0;
-		padding: 1.5rem;
+		padding: 1rem;
 		background: #0a0a0a;
 		border-top: 1px solid #222222;
+		/* Add safe area for mobile home indicator */
+		padding-bottom: max(1rem, env(safe-area-inset-bottom));
+		padding-left: max(1rem, env(safe-area-inset-left));
+		padding-right: max(1rem, env(safe-area-inset-right));
 	}
 
 	.error-banner {
@@ -1380,15 +1378,10 @@
 		transition: all 0.2s;
 	}
 
-	.input-controls:focus-within {
-		border-color: #667eea;
-		box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-	}
-
 	.message-input {
 		flex: 1;
 		background: transparent;
-		border: none;
+		border: none !important;
 		color: #e5e5e5;
 		font-size: 0.9375rem;
 		line-height: 1.5;
@@ -1397,10 +1390,13 @@
 		min-height: 24px;
 		font-family: inherit;
 		padding: 0.5rem 0;
+		box-shadow: none !important;
 	}
 
 	.message-input:focus {
-		outline: none;
+		outline: none !important;
+		border: none !important;
+		box-shadow: none !important;
 	}
 
 	.message-input::placeholder {
@@ -1753,15 +1749,22 @@
 		background: #444444;
 	}
 
-	/* Mobile optimizations */
+	/* Mobile-First Responsive Design */
 	@media (max-width: 768px) {
-		.top-nav {
-			padding: 0.5rem 1rem;
-			height: 56px;
+		/* Hide username on mobile, show only avatar */
+		.user-pill .user-name {
+			display: none;
 		}
 
-		.nav-left {
-			gap: 0.5rem;
+		.user-pill {
+			padding: 0.375rem;
+		}
+
+		/* Adjust navigation for mobile */
+		.top-nav {
+			padding: 0.5rem 0.75rem;
+			height: auto;
+			min-height: 50px;
 		}
 
 		.logo {
@@ -1780,27 +1783,33 @@
 			white-space: nowrap;
 		}
 
+		.nav-left {
+			gap: 0.5rem;
+		}
+
+		.nav-right {
+			gap: 0.5rem;
+		}
+
+		/* Reduce status pill sizes */
 		.status-pill {
 			padding: 0.375rem 0.625rem;
 			font-size: 0.8125rem;
 		}
 
-		.user-pill {
-			padding: 0.25rem 0.625rem 0.25rem 0.25rem;
+		.login-btn {
+			padding: 0.375rem 0.75rem;
 			font-size: 0.8125rem;
 		}
 
-		.user-avatar {
-			width: 20px;
-			height: 20px;
+		.login-btn span {
+			display: none;
 		}
 
-		.input-area {
-			padding: 1rem;
-		}
-
+		/* Optimize messages for mobile */
 		.messages-list {
-			padding: 1.5rem 0.75rem;
+			padding: 1rem 0.75rem;
+			gap: 1rem;
 		}
 
 		.message-bubble {
@@ -1814,8 +1823,9 @@
 			font-size: 0.8125rem;
 		}
 
+		/* Optimize welcome state */
 		.welcome-state {
-			padding: 1.5rem;
+			padding: 1.5rem 1rem;
 		}
 
 		.welcome-state h2 {
@@ -1824,6 +1834,22 @@
 
 		.welcome-state p {
 			font-size: 0.9375rem;
+		}
+
+		.welcome-icon {
+			width: 64px;
+			height: 64px;
+		}
+
+		.welcome-icon svg {
+			width: 48px;
+			height: 48px;
+		}
+
+		/* Optimize input area for mobile */
+		.input-area {
+			padding: 0.75rem;
+			padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
 		}
 
 		.input-controls {
@@ -1887,6 +1913,62 @@
 
 		.status-pill span {
 			font-size: 0.75rem;
+		}
+
+		.send-btn {
+			width: 32px;
+			height: 32px;
+		}
+
+		.send-btn svg {
+			width: 18px;
+			height: 18px;
+		}
+
+		.voice-btn {
+			width: 40px;
+			height: 40px;
+		}
+
+		.voice-btn svg {
+			width: 20px;
+			height: 20px;
+		}
+
+		/* Adjust error banner */
+		.error-banner {
+			padding: 0.625rem 0.875rem;
+			font-size: 0.8125rem;
+			margin-bottom: 0.75rem;
+		}
+
+		/* User dropdown positioning */
+		.user-dropdown {
+			right: -0.5rem;
+		}
+	}
+
+	/* Extra small devices */
+	@media (max-width: 480px) {
+		.repo-badge span {
+			max-width: 120px;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		.status-pill {
+			font-size: 0.75rem;
+			padding: 0.25rem 0.5rem;
+		}
+
+		.status-pill span {
+			display: none;
+		}
+
+		.message-bubble {
+			max-width: 90%;
+			padding: 0.75rem 0.875rem;
 		}
 	}
 </style>
