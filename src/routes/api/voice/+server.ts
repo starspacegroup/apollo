@@ -9,24 +9,33 @@ import {
 	createGitHubIssue,
 	searchRepositoryCode,
 	addIssueComment,
-	updateGitHubIssue
+	updateGitHubIssue,
+	getRepositoryTree
 } from '$lib/github-helpers';
 
-const GITHUB_ASSISTANT_SYSTEM_PROMPT = `You are Apollo, an AI assistant for GitHub repository management and development.
+const GITHUB_ASSISTANT_SYSTEM_PROMPT = `You are Apollo, a GitHub assistant with direct access to repository tools.
 
 {{REPO_CONTEXT}}
 
+You have these tools available - use them when needed:
+- get_repository_summary
+- list_issues
+- create_issue  
+- search_code
+- add_issue_comment
+- update_issue
+- get_repository_tree
+
+When users ask you to do something, call the appropriate tool immediately. Don't ask for permission or describe what you would do - just execute the tool.
+
+Examples:
+- "list issues" → call list_issues()
+- "search for auth" → call search_code(query="auth")
+- "create issue..." → call create_issue(title="...", body="...")
+
 {{ASSISTANT_INSTRUCTIONS}}
 
-{{LEGACY_CONTEXT}}
-
-CRITICAL INSTRUCTIONS:
-- You have DIRECT ACCESS to GitHub API tools and MUST use them when users request actions
-- When a user asks you to perform an action (create issue, search code, list issues, etc.), YOU MUST CALL THE APPROPRIATE TOOL IMMEDIATELY
-- Do NOT just describe what you could do - ACTUALLY USE THE TOOLS
-- After calling a tool and getting results, present them to the user in a helpful, conversational way
-- The repository context is ALREADY SET - you are working with a specific repository and have full permissions to act on it
-- Tools available: get_repository_summary, list_issues, create_issue, search_code, add_issue_comment, update_issue`;
+{{LEGACY_CONTEXT}}`;
 
 async function setupOpenAIConnection(
 	clientWs: any,
@@ -36,7 +45,7 @@ async function setupOpenAIConnection(
 ) {
 	// Connect to OpenAI Realtime API
 	const url = new URL('wss://api.openai.com/v1/realtime');
-	url.searchParams.set('model', 'gpt-4o-mini-realtime-preview');
+	url.searchParams.set('model', 'gpt-4o-realtime-preview-2024-10-01');
 
 	const openaiWs = new WebSocket(url.toString(), [
 		'realtime',
@@ -58,6 +67,10 @@ async function setupOpenAIConnection(
 		// Log all message types for debugging (except audio data)
 		if (message.type && !message.type.includes('audio')) {
 			console.log('OpenAI message type:', message.type);
+			// Log more details for responses
+			if (message.type.includes('response')) {
+				console.log('Response details:', JSON.stringify(message, null, 2).substring(0, 500));
+			}
 		}
 
 		// Handle function/tool calls - check for the correct event type from OpenAI Realtime API
@@ -72,7 +85,7 @@ async function setupOpenAIConnection(
 			const args = JSON.parse(message.item.arguments || '{}');
 			const callId = message.item.call_id;
 
-			console.log('Tool call executing:', functionName, args);
+			console.log('Tool call executing:', functionName, 'with args:', args);
 
 			try {
 				let result: any = null;
@@ -133,6 +146,19 @@ async function setupOpenAIConnection(
 						result = { success: true, message: 'Comment added successfully' };
 						break;
 
+					case 'update_issue':
+						const updates: any = {};
+						if (args.title) updates.title = args.title;
+						if (args.body) updates.body = args.body;
+						if (args.state) updates.state = args.state;
+						if (args.labels) updates.labels = args.labels;
+						result = await updateGitHubIssue(accessToken, owner, repo, args.issue_number, updates);
+						break;
+
+					case 'get_repository_tree':
+						result = await getRepositoryTree(accessToken, owner, repo, args.branch);
+						break;
+
 					default:
 						throw new Error(`Unknown function: ${functionName}`);
 				}
@@ -182,15 +208,11 @@ async function setupOpenAIConnection(
 		// Set repository context if repository is provided (without downloading contents)
 		let repoContext = '';
 		if (repository) {
-			repoContext = `You are currently working with the GitHub repository: **${repository}**\n\n`;
-			repoContext += `IMPORTANT: You have access to GitHub API tools and can perform the following actions on the ${repository} repository:\n`;
-			repoContext += `- Get repository summary and information\n`;
-			repoContext += `- List, create, update, and comment on issues\n`;
-			repoContext += `- Search through the codebase\n\n`;
-			repoContext += `When users ask you to perform these actions, you should USE THE TOOLS AVAILABLE TO YOU to execute them directly. Don't just explain what could be done - actually do it!\n\n`;
+			const [owner, repo] = repository.split('/');
+			repoContext = `Connected to repository: ${repository} (owner: ${owner}, repo: ${repo})\n`;
+			repoContext += `All tools are configured for this repository. Just call them.\n\n`;
 		} else {
-			repoContext =
-				'No repository is currently selected. You can still help users plan and structure their GitHub issues.\n\n';
+			repoContext = 'No repository selected.\n\n';
 		}
 
 		const instructions = GITHUB_ASSISTANT_SYSTEM_PROMPT.replace('{{REPO_CONTEXT}}', repoContext)
@@ -290,6 +312,53 @@ async function setupOpenAIConnection(
 					},
 					required: ['issue_number', 'comment']
 				}
+			},
+			{
+				type: 'function',
+				name: 'update_issue',
+				description: 'Update an existing GitHub issue (title, body, state, or labels)',
+				parameters: {
+					type: 'object',
+					properties: {
+						issue_number: {
+							type: 'number',
+							description: 'Issue number to update'
+						},
+						title: {
+							type: 'string',
+							description: 'New issue title (optional)'
+						},
+						body: {
+							type: 'string',
+							description: 'New issue body/description in markdown format (optional)'
+						},
+						state: {
+							type: 'string',
+							enum: ['open', 'closed'],
+							description: 'New issue state (optional)'
+						},
+						labels: {
+							type: 'array',
+							items: { type: 'string' },
+							description: 'New labels for the issue (optional)'
+						}
+					},
+					required: ['issue_number']
+				}
+			},
+			{
+				type: 'function',
+				name: 'get_repository_tree',
+				description: 'Get the file tree structure of the repository to see all files and folders',
+				parameters: {
+					type: 'object',
+					properties: {
+						branch: {
+							type: 'string',
+							description: 'Branch name (optional, defaults to default branch)'
+						}
+					}
+				}
 			}
 		];
 
@@ -311,36 +380,16 @@ async function setupOpenAIConnection(
 					prefix_padding_ms: 300,
 					silence_duration_ms: 800
 				},
-				tools
+				tools,
+				tool_choice: 'auto' // Enable automatic tool calling
 			}
 		};
 
 		console.log('Sending session config with', tools.length, 'tools for repository:', repository);
-		console.log('Instructions include:', instructions.substring(0, 200) + '...');
+		console.log('Tool choice:', sessionConfig.session.tool_choice);
+		console.log('Tools:', tools.map(t => t.name).join(', '));
+		console.log('Instructions length:', instructions.length);
 		openaiWs.send(JSON.stringify(sessionConfig));
-
-		// Send initial context message about the repository
-		if (repository) {
-			setTimeout(() => {
-				const contextMessage = {
-					type: 'conversation.item.create',
-					item: {
-						type: 'message',
-						role: 'user',
-						content: [
-							{
-								type: 'input_text',
-								text: `I'm working on the ${repository} repository. Please introduce yourself and let me know what you can help me with.`
-							}
-						]
-					}
-				};
-				openaiWs.send(JSON.stringify(contextMessage));
-
-				// Trigger a response to the context message
-				openaiWs.send(JSON.stringify({ type: 'response.create' }));
-			}, 500);
-		}
 	});
 
 	// Handle errors
