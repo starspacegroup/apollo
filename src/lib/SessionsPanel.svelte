@@ -626,7 +626,8 @@
 	/* Footer */
 	.sidebar-footer {
 		padding: 0.5rem 0.75rem 0.75rem 0.75rem;
-		position: relative;
+		margin-top: auto;
+		flex-shrink: 0;
 	}
 
 	.sessions-sidebar.collapsed .sidebar-footer {
