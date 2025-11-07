@@ -325,6 +325,12 @@ export const GET: RequestHandler = async ({ request, platform, url, locals }) =>
 		return new Response('Expected Upgrade: websocket', { status: 426 });
 	}
 
+	// Check authentication first
+	const session = await locals.auth();
+	if (!session?.accessToken) {
+		return new Response('Authentication required', { status: 401 });
+	}
+
 	// Get OpenAI API key from environment
 	const OPENAI_API_KEY = platform?.env?.OPENAI_API_KEY;
 
@@ -336,8 +342,7 @@ export const GET: RequestHandler = async ({ request, platform, url, locals }) =>
 	const repository = url.searchParams.get('repo') || undefined;
 
 	// Get access token from session
-	const session = await locals.auth();
-	const accessToken = session?.accessToken;
+	const accessToken = session.accessToken;
 
 	// Cloudflare Workers environment
 	const webSocketPair = new WebSocketPair();

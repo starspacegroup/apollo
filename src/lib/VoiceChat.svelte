@@ -268,11 +268,16 @@
 				error = 'Connection error occurred';
 			};
 
-			ws.onclose = () => {
+			ws.onclose = (event) => {
 				isConnected = false;
 				isRecording = false;
 				isVoiceMode = false;
 				console.log('Disconnected from AI chat');
+				
+				// If connection was rejected due to authentication (401)
+				if (event.code === 1008 || event.reason?.includes('Authentication')) {
+					error = 'Authentication required. Please sign in.';
+				}
 			};
 		} catch (err) {
 			console.error('Error connecting:', err);
