@@ -2,6 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import MarkdownRenderer from './MarkdownRenderer.svelte';
 	import { signIn, signOut } from '@auth/sveltekit/client';
+	import { generateSessionId, saveMessage, loadUserHistory } from './session-history-client';
 
 	// Accept repository as a prop
 	let {
@@ -42,6 +43,9 @@
 	let audioProcessor: ScriptProcessorNode | null = null;
 	let messagesContainerRef = $state<HTMLDivElement>();
 	let showUserMenu = $state(false);
+	
+	// Session history tracking
+	let currentSessionId = $state(generateSessionId());
 
 	// Auto-scroll to bottom when transcript changes
 	$effect(() => {
@@ -55,7 +59,19 @@
 	});
 
 	// Auto-connect on mount
-	onMount(() => {
+	onMount(async () => {
+		// Load session history if user is authenticated
+		if (session?.user?.id) {
+			try {
+				const history = await loadUserHistory(50); // Load last 50 messages
+				if (history.length > 0) {
+					transcript = history;
+				}
+			} catch (err) {
+				console.error('Failed to load session history:', err);
+			}
+		}
+
 		connectWebSocket();
 
 		// Close user menu when clicking outside
@@ -574,6 +590,13 @@
 
 	function addTranscript(role: string, text: string) {
 		transcript = [...transcript, { role, text }];
+		
+		// Save to database if user is authenticated
+		if (session?.user?.id && role !== 'system') {
+			saveMessage(currentSessionId, role as 'user' | 'assistant', text, {
+				repository
+			}).catch(err => console.error('Failed to save message:', err));
+		}
 	}
 
 	function updateTranscript(role: string, text: string) {
