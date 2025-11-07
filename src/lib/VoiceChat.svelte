@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import MarkdownRenderer from './MarkdownRenderer.svelte';
+	import SessionsPanel from './SessionsPanel.svelte';
 	import { signIn, signOut } from '@auth/sveltekit/client';
+	import { sessionStore, currentSession, type ChatSession, type ChatMessage } from './stores/sessionStore';
+	import { repoStore } from './stores/repoStore';
 
 	// Accept repository as a prop
 	let {
@@ -28,6 +31,7 @@
 	let error = $state('');
 	let isLoadingRepo = $state(false);
 	let repoLoadStatus = $state('');
+	// Transcript now comes from session store, but we keep local state for reactivity
 	let transcript = $state<Array<{ role: string; text: string }>>([]);
 	let audioWorklet: AudioWorkletNode | null = null;
 	let audioQueue: Array<ArrayBuffer> = [];
@@ -41,9 +45,9 @@
 	let textInputRef = $state<HTMLTextAreaElement>();
 	let audioProcessor: ScriptProcessorNode | null = null;
 	let messagesContainerRef = $state<HTMLDivElement>();
-	let showUserMenu = $state(false);
 	let connectedRepository = $state(''); // Track which repository we're connected to
 	let isIntentionalDisconnect = false; // Track if disconnect is intentional (e.g., switching repos)
+	let sidebarCollapsed = $state(false); // Track sidebar collapsed state
 
 	// Auto-scroll to bottom when transcript changes
 	$effect(() => {
@@ -62,8 +66,22 @@
 		// Only reconnect if repository actually changed
 		if (repository !== connectedRepository) {
 			if (repository) {
-				// Repository was selected or changed, connect to WebSocket
+				// Repository was selected or changed, create/load session and connect
 				console.log('Repository changed, connecting to:', repository);
+				
+				// Get or create session for this repository
+				const sessionId = sessionStore.getOrCreateSessionForRepo(repository);
+				
+				// Load session messages into local transcript
+				const currentSessionData = sessionStore.getCurrentSession();
+				if (currentSessionData) {
+					// Convert ChatMessage[] to transcript format
+					transcript = currentSessionData.messages.map(msg => ({
+						role: msg.role,
+						text: msg.text
+					}));
+				}
+				
 				connectWebSocket();
 			} else {
 				// Repository was cleared, disconnect
@@ -75,7 +93,30 @@
 					isConnected = false;
 				}
 				connectedRepository = '';
+				transcript = [];
 			}
+		}
+	});
+
+	// Sync transcript to current session whenever it changes
+	$effect(() => {
+		if (transcript.length > 0 && $currentSession) {
+			// This effect runs when transcript changes
+			// We need to be careful not to create infinite loops
+			const sessionMessages = $currentSession.messages;
+			
+			// Only sync if transcript is different from session
+			// (to avoid circular updates)
+			const transcriptChanged = 
+				transcript.length !== sessionMessages.length ||
+				transcript.some((msg, idx) => 
+					!sessionMessages[idx] || 
+					msg.text !== sessionMessages[idx].text ||
+					msg.role !== sessionMessages[idx].role
+				);
+
+			// This is handled by addTranscript and updateTranscript functions
+			// which directly call sessionStore methods
 		}
 	});
 
@@ -83,20 +124,6 @@
 	onMount(() => {
 		// Connection will be handled by the $effect above
 		// Just setup cleanup handlers
-
-		// Close user menu when clicking outside
-		const handleClickOutside = (e: MouseEvent) => {
-			const target = e.target as HTMLElement;
-			if (!target.closest('.user-menu-container')) {
-				showUserMenu = false;
-			}
-		};
-
-		document.addEventListener('click', handleClickOutside);
-
-		return () => {
-			document.removeEventListener('click', handleClickOutside);
-		};
 	});
 
 	async function connectWebSocket() {
@@ -275,6 +302,9 @@
 							if (lastUserIndex !== -1) {
 								transcript[lastUserIndex].text = data.transcript;
 								transcript = [...transcript];
+								
+								// Sync to session store - replace the placeholder
+								sessionStore.replaceLastMessage(data.transcript);
 							} else {
 								// Fallback: add if not found
 								addTranscript('user', data.transcript);
@@ -620,12 +650,23 @@
 
 	function addTranscript(role: string, text: string) {
 		transcript = [...transcript, { role, text }];
+		
+		// Sync to session store
+		const message: ChatMessage = {
+			role: role as 'user' | 'assistant' | 'system',
+			text,
+			timestamp: Date.now()
+		};
+		sessionStore.addMessage(message);
 	}
 
 	function updateTranscript(role: string, text: string) {
 		if (transcript.length > 0 && transcript[transcript.length - 1].role === role) {
 			transcript[transcript.length - 1].text += text;
 			transcript = [...transcript];
+			
+			// Sync to session store - update last message
+			sessionStore.updateLastMessage(text);
 		} else {
 			addTranscript(role, text);
 		}
@@ -736,133 +777,123 @@
 		isSpeaking = false;
 	}
 
+	// Session handlers
+	function handleNewSession() {
+		if (!repository) {
+			// Can't create session without repository
+			error = 'Please select a repository first';
+			return;
+		}
+
+		// Create a new session for current repository
+		sessionStore.createSession(repository);
+		
+		// Clear transcript to start fresh
+		transcript = [];
+		
+		// Clear any existing conversation state
+		if (ws && ws.readyState === WebSocket.OPEN) {
+			// Could send a clear conversation command if needed
+			console.log('Started new session for:', repository);
+		}
+	}
+
+	function handleSessionSelect(session: ChatSession) {
+		// Switch to the selected session
+		sessionStore.switchSession(session.id);
+		
+		// Load messages from the session
+		transcript = session.messages.map(msg => ({
+			role: msg.role,
+			text: msg.text
+		}));
+		
+		// If session is for different repo, switch to that repo
+		if (session.repository !== repository) {
+			console.log('Switching to repository:', session.repository);
+			// Update the repo store to trigger repository change
+			repoStore.set(session.repository);
+		}
+	}
+
 	onDestroy(() => {
 		disconnect();
 	});
 </script>
 
 <div class="grok-container">
-	<!-- Top Navigation Bar -->
-	<nav class="top-nav">
-		<div class="nav-left">
-			<h1 class="logo">Apollo</h1>
-			{#if session?.user}
-				{#if repository}
-					<button onclick={changeRepo} class="repo-badge connected" title="Connected to {repository}\nClick to change repository">
-						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-							<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-						</svg>
-						<span class="repo-full-name">{repository}</span>
-						{#if isConnected}
-							<span class="connection-indicator" title="Connected to AI"></span>
-						{/if}
-					</button>
-				{:else}
-					<button onclick={changeRepo} class="repo-badge select-repo" title="Select a repository to start">
-						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-							<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-						</svg>
-						<span>Select Repository</span>
-					</button>
-				{/if}
-			{/if}
-		</div>
-
-		<div class="nav-right">
-			{#if isLoadingRepo}
-				<div class="status-pill loading">
-					<span class="spinner"></span>
-					<span>{repoLoadStatus}</span>
-				</div>
-			{:else if repoLoadStatus}
-				<div class="status-pill success">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="16"
-						height="16"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<polyline points="20 6 9 17 4 12"></polyline>
-					</svg>
-					<span>{repoLoadStatus}</span>
-				</div>
-			{/if}
-			{#if isRecording}
-				<div class="status-pill recording">
-					<span class="pulse"></span>
-					<span>Listening</span>
-				</div>
-			{/if}
-			{#if isSpeaking}
-				<div class="status-pill speaking">
-					<span class="wave"></span>
-					<span>Speaking</span>
-				</div>
-			{/if}
-			{#if session?.user}
-				<div class="user-menu-container">
-					<button 
-						class="user-pill" 
-						onclick={() => showUserMenu = !showUserMenu}
-						title={session.user.name || session.user.username || 'User menu'}
-					>
-						{#if session.user.image}
-							<img src={session.user.image} alt={session.user.name || 'User'} class="user-avatar" />
-						{/if}
-						<span class="user-name">{session.user.name || session.user.username}</span>
-						<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron" class:open={showUserMenu}>
-							<polyline points="6 9 12 15 18 9"></polyline>
-						</svg>
-					</button>
-
-					{#if showUserMenu}
-						<div class="user-dropdown">
-							<button
-								onclick={() => {
-									signOut();
-									showUserMenu = false;
-								}}
-								class="dropdown-item logout"
-							>
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									width="16"
-									height="16"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-								>
-									<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-									<polyline points="16 17 21 12 16 7"></polyline>
-									<line x1="21" y1="12" x2="9" y2="12"></line>
-								</svg>
-								<span>Sign out</span>
-							</button>
-						</div>
+	<!-- Left Sidebar - Chat History -->
+	{#if session?.user}
+		<SessionsPanel
+			onSessionSelect={handleSessionSelect}
+			onNewSession={handleNewSession}
+			bind:isCollapsed={sidebarCollapsed}
+			{session}
+		/>
+	{/if}
+	
+	<!-- Main Content Area -->
+	<div class="main-content">
+		<!-- Top Navigation Bar -->
+		<nav class="top-nav">
+			<div class="nav-left">
+				<h1 class="logo">Apollo</h1>
+				{#if session?.user}
+					{#if repository}
+						<button onclick={changeRepo} class="repo-badge connected" title="Connected to {repository}\nClick to change repository">
+							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+							</svg>
+							<span class="repo-full-name">{repository}</span>
+							{#if isConnected}
+								<span class="connection-indicator" title="Connected to AI"></span>
+							{/if}
+						</button>
+					{:else}
+						<button onclick={changeRepo} class="repo-badge select-repo" title="Select a repository to start">
+							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+							</svg>
+							<span>Select Repository</span>
+						</button>
 					{/if}
-				</div>
-			{:else}
-				<button onclick={() => signIn('github')} class="login-btn" title="Sign in with GitHub">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="18"
-						height="18"
-						viewBox="0 0 24 24"
-						fill="currentColor"
-					>
-						<path
-							d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
-						/>
-					</svg>
-					<span>Sign in with GitHub</span>
-				</button>
-			{/if}
+				{/if}
+			</div>
+
+			<div class="nav-right">
+				{#if isLoadingRepo}
+					<div class="status-pill loading">
+						<span class="spinner"></span>
+						<span>{repoLoadStatus}</span>
+					</div>
+				{:else if repoLoadStatus}
+					<div class="status-pill success">
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="16"
+							height="16"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<polyline points="20 6 9 17 4 12"></polyline>
+						</svg>
+						<span>{repoLoadStatus}</span>
+					</div>
+				{/if}
+				{#if isRecording}
+					<div class="status-pill recording">
+						<span class="pulse"></span>
+						<span>Listening</span>
+					</div>
+				{/if}
+				{#if isSpeaking}
+					<div class="status-pill speaking">
+						<span class="wave"></span>
+						<span>Speaking</span>
+					</div>
+				{/if}
 		</div>
 	</nav>
 
@@ -903,6 +934,21 @@
 						</svg>
 					</div>
 					<h2>Connected to {repository}</h2>
+					{#if $currentSession}
+						<div class="session-info">
+							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<circle cx="12" cy="12" r="10"></circle>
+								<path d="M12 6v6l4 2"></path>
+							</svg>
+							<span>{$currentSession.title}</span>
+							<button class="new-chat-mini-btn" onclick={handleNewSession} title="Start New Chat">
+								<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<line x1="12" y1="5" x2="12" y2="19"></line>
+									<line x1="5" y1="12" x2="19" y2="12"></line>
+								</svg>
+							</button>
+						</div>
+					{/if}
 					<p class="welcome-description">I can help you with:</p>
 					<div class="capabilities-list">
 						<div class="capability-item">
@@ -1080,12 +1126,13 @@
 			</div>
 		</div>
 	</div>
+	</div>
 </div>
 
 <style>
 	.grok-container {
 		display: flex;
-		flex-direction: column;
+		flex-direction: row;
 		height: 100vh;
 		/* Use dynamic viewport height on mobile to account for browser UI */
 		height: 100dvh;
@@ -1094,6 +1141,14 @@
 		color: #e5e5e5;
 		font-family:
 			-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+	}
+	
+	/* Main Content Area - takes rest of space */
+	.main-content {
+		display: flex;
+		flex-direction: column;
+		flex: 1;
+		min-width: 0; /* Allow flexbox to shrink */
 	}
 
 	/* Top Navigation */
@@ -1264,104 +1319,6 @@
 		color: #e5e5e5;
 	}
 
-	.user-pill:hover {
-		background: #222222;
-		border-color: #444444;
-	}
-
-	.user-pill .chevron {
-		transition: transform 0.2s;
-		color: #a0a0a0;
-	}
-
-	.user-pill .chevron.open {
-		transform: rotate(180deg);
-	}
-
-	.user-avatar {
-		width: 24px;
-		height: 24px;
-		border-radius: 50%;
-	}
-
-	.user-dropdown {
-		position: absolute;
-		top: calc(100% + 0.5rem);
-		right: 0;
-		min-width: 160px;
-		background: #1a1a1a;
-		border: 1px solid #333333;
-		border-radius: 0.5rem;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-		overflow: hidden;
-		z-index: 1000;
-		animation: dropdownSlide 0.2s ease-out;
-	}
-
-	@keyframes dropdownSlide {
-		from {
-			opacity: 0;
-			transform: translateY(-8px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-
-	.dropdown-item {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		width: 100%;
-		padding: 0.75rem 1rem;
-		background: transparent;
-		border: none;
-		color: #e5e5e5;
-		font-size: 0.875rem;
-		cursor: pointer;
-		transition: all 0.2s;
-		text-align: left;
-	}
-
-	.dropdown-item:hover {
-		background: #222222;
-	}
-
-	.dropdown-item.logout:hover {
-		color: #ef4444;
-	}
-
-	.dropdown-item svg {
-		flex-shrink: 0;
-	}
-
-	.login-btn {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.5rem 1rem;
-		background: #1a1a1a;
-		border: 1px solid #10b981;
-		border-radius: 0.5rem;
-		color: #10b981;
-		font-size: 0.875rem;
-		font-weight: 500;
-		cursor: pointer;
-		transition: all 0.2s;
-	}
-
-	.login-btn:hover {
-		background: #10b981;
-		color: #000000;
-		transform: translateY(-1px);
-		box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-	}
-
-	.login-btn svg {
-		flex-shrink: 0;
-	}
-
 	/* Chat Area */
 	.chat-area {
 		flex: 1;
@@ -1459,6 +1416,52 @@
 		margin-top: 1.5rem !important;
 		font-size: 0.875rem !important;
 		font-style: italic;
+	}
+
+	.session-info {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.75rem 1rem;
+		background: rgba(102, 126, 234, 0.1);
+		border: 1px solid rgba(102, 126, 234, 0.3);
+		border-radius: 0.5rem;
+		color: #e5e5e5;
+		font-size: 0.875rem;
+		margin-top: 1rem;
+	}
+
+	.session-info svg {
+		color: #667eea;
+		flex-shrink: 0;
+	}
+
+	.session-info span {
+		flex: 1;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.new-chat-mini-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		padding: 0;
+		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		border: none;
+		border-radius: 0.375rem;
+		color: white;
+		cursor: pointer;
+		transition: all 0.2s;
+		flex-shrink: 0;
+	}
+
+	.new-chat-mini-btn:hover {
+		opacity: 0.9;
+		transform: scale(1.05);
 	}
 
 	.messages-list {
@@ -1948,15 +1951,6 @@
 
 	/* Mobile-First Responsive Design */
 	@media (max-width: 768px) {
-		/* Hide username on mobile, show only avatar */
-		.user-pill .user-name {
-			display: none;
-		}
-
-		.user-pill {
-			padding: 0.375rem;
-		}
-
 		/* Adjust navigation for mobile */
 		.top-nav {
 			padding: 0.5rem 0.75rem;
@@ -1992,15 +1986,6 @@
 		.status-pill {
 			padding: 0.375rem 0.625rem;
 			font-size: 0.8125rem;
-		}
-
-		.login-btn {
-			padding: 0.375rem 0.75rem;
-			font-size: 0.8125rem;
-		}
-
-		.login-btn span {
-			display: none;
 		}
 
 		/* Optimize messages for mobile */
@@ -2102,10 +2087,6 @@
 
 		.repo-badge span {
 			max-width: 80px;
-		}
-
-		.user-pill span {
-			display: none;
 		}
 
 		.status-pill span {
