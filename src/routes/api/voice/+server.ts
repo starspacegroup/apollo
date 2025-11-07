@@ -45,7 +45,7 @@ async function setupOpenAIConnection(
 ) {
 	// Connect to OpenAI Realtime API
 	const url = new URL('wss://api.openai.com/v1/realtime');
-	url.searchParams.set('model', 'gpt-4o-realtime-preview-2024-10-01');
+	url.searchParams.set('model', 'gpt-4o-mini-realtime-preview');
 
 	const openaiWs = new WebSocket(url.toString(), [
 		'realtime',
