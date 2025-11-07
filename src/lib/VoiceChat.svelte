@@ -1269,7 +1269,7 @@
 	.message-input {
 		flex: 1;
 		background: transparent;
-		border: none;
+		border: none !important;
 		color: #e5e5e5;
 		font-size: 0.9375rem;
 		line-height: 1.5;
@@ -1278,10 +1278,13 @@
 		min-height: 24px;
 		font-family: inherit;
 		padding: 0.5rem 0;
+		box-shadow: none !important;
 	}
 
 	.message-input:focus {
-		outline: none;
+		outline: none !important;
+		border: none !important;
+		box-shadow: none !important;
 	}
 
 	.message-input::placeholder {
