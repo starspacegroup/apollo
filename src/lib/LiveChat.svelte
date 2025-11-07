@@ -84,6 +84,11 @@
 				}
 				
 				connectWebSocket();
+				
+				// Focus the text input when repository is selected
+				setTimeout(() => {
+					textInputRef?.focus();
+				}, 100);
 			} else {
 				// Repository was cleared, disconnect
 				console.log('Repository cleared, disconnecting');
@@ -825,6 +830,11 @@
 		
 		// Session will appear in history once the first message is added
 		console.log('New session created, will appear in history after first message');
+		
+		// Focus the text input after creating a new session
+		setTimeout(() => {
+			textInputRef?.focus();
+		}, 0);
 	}
 
 	function handleSessionSelect(session: ChatSession) {
@@ -843,6 +853,11 @@
 			// Update the repo store to trigger repository change
 			repoStore.set(session.repository);
 		}
+		
+		// Focus the text input when switching sessions
+		setTimeout(() => {
+			textInputRef?.focus();
+		}, 0);
 	}
 
 	onDestroy(() => {
