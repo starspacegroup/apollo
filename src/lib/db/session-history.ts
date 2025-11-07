@@ -71,16 +71,22 @@ export function createSessionHistoryService(db: D1Database): SessionHistoryServi
 		},
 
 		/**
-		 * Get all messages for a user, optionally limited
+		 * Get all messages for a user, optionally limited to most recent N messages
+		 * Returns messages in chronological order (oldest first) for display
 		 */
 		async getUserHistory(userId: string, limit: number = 100): Promise<SessionMessage[]> {
+			// Get the most recent N messages, then order them chronologically
 			const result = await db
 				.prepare(
 					`SELECT id, user_id, session_id, role, content, created_at, metadata
-					 FROM session_history
-					 WHERE user_id = ?
-					 ORDER BY created_at DESC
-					 LIMIT ?`
+					 FROM (
+						SELECT id, user_id, session_id, role, content, created_at, metadata
+						FROM session_history
+						WHERE user_id = ?
+						ORDER BY created_at DESC
+						LIMIT ?
+					 )
+					 ORDER BY created_at ASC`
 				)
 				.bind(userId, limit)
 				.all<SessionMessage>();
