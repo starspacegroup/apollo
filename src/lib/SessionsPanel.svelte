@@ -691,23 +691,29 @@
 	}
 
 	.user-avatar-small {
-		width: 24px;
-		height: 24px;
+		width: 32px;
+		height: 32px;
+		min-width: 32px;
+		min-height: 32px;
 		border-radius: 50%;
 		object-fit: cover;
+		flex-shrink: 0;
 	}
 
 	.user-avatar-placeholder {
-		width: 24px;
-		height: 24px;
+		width: 32px;
+		height: 32px;
+		min-width: 32px;
+		min-height: 32px;
 		border-radius: 50%;
 		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		font-size: 0.75rem;
+		font-size: 0.875rem;
 		font-weight: 600;
 		color: white;
+		flex-shrink: 0;
 	}
 
 	.chevron-up {
