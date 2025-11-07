@@ -188,7 +188,7 @@ End Session:
 ## UI Component Structure
 
 ```
-VoiceChat.svelte
+LiveChat.svelte
 │
 ├── Header
 │   ├── Title: "AI Chat"

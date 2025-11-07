@@ -68,9 +68,9 @@ A polished UI component for managing chat sessions:
 - Hover states for session actions
 - Empty state with helpful messaging
 
-### 3. VoiceChat Integration
+### 3. LiveChat Integration
 
-Updated `src/lib/VoiceChat.svelte` to fully integrate session management:
+Updated `src/lib/LiveChat.svelte` to fully integrate session management:
 
 #### Changes Made
 
@@ -173,7 +173,7 @@ User Action → sessionStore → localStorage
                 ↓
          currentSession (derived)
                 ↓
-           VoiceChat UI
+           LiveChat UI
 ```
 
 ### Message Flow
@@ -187,7 +187,7 @@ WebSocket Message → addTranscript() → Local transcript + sessionStore
 ### Repository Switch Flow
 
 ```
-User selects repo → repoStore.set() → VoiceChat repository effect
+User selects repo → repoStore.set() → LiveChat repository effect
                                               ↓
                                    sessionStore.getOrCreateSessionForRepo()
                                               ↓
@@ -203,7 +203,7 @@ src/lib/
 ├── stores/
 │   └── sessionStore.ts          # Session state management
 ├── SessionsPanel.svelte          # Sessions UI component
-└── VoiceChat.svelte              # Updated with session integration
+└── LiveChat.svelte              # Updated with session integration
 
 CHAT_SESSIONS_GUIDE.md            # User documentation
 SESSIONS_IMPLEMENTATION.md        # This file
@@ -213,7 +213,7 @@ SESSIONS_IMPLEMENTATION.md        # This file
 
 ### 1. Preventing Circular Updates
 
-The session sync effect in VoiceChat checks if transcript differs from session
+The session sync effect in LiveChat checks if transcript differs from session
 before syncing to avoid infinite loops.
 
 ### 2. Message Timestamps

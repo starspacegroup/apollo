@@ -1,7 +1,7 @@
 ﻿<script lang="ts">
 import type { PageData } from './';
 import RepoSelector from '$lib/RepoSelector.svelte';
-import VoiceChat from '$lib/VoiceChat.svelte';
+import LiveChat from '$lib/LiveChat.svelte';
 import { repoStore } from '$lib/stores/repoStore';
 import { signIn } from '@auth/sveltekit/client';
 
@@ -22,7 +22,7 @@ repoSelector?.openModal();
 <RepoSelector {session} bind:this={repoSelector} />
 
 <div class="app-container">
-<VoiceChat repository={$repoStore || ''} {session} {changeRepo} />
+<LiveChat repository={$repoStore || ''} {session} {changeRepo} />
 </div>
 {:else}
 <div class="login-container">

@@ -8,7 +8,7 @@ conversation.
 
 ## Changes Made
 
-### 1. VoiceChat.svelte Component Updates
+### 1. LiveChat.svelte Component Updates
 
 #### New State Variables
 
