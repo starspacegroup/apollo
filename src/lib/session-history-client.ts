@@ -39,7 +39,7 @@ export async function saveMessage(
 		});
 
 		if (!response.ok) {
-			const data = await response.json();
+			const data = (await response.json()) as { message?: string };
 			throw new Error(data.message || 'Failed to save message');
 		}
 	} catch (err) {
@@ -63,7 +63,7 @@ export async function loadUserHistory(limit: number = 100): Promise<Message[]> {
 			throw new Error('Failed to load session history');
 		}
 
-		const data = await response.json();
+		const data = (await response.json()) as { success: boolean; history: any[] };
 		if (data.success && Array.isArray(data.history)) {
 			// Convert database format to component format
 			return data.history.map((msg: any) => ({
@@ -90,7 +90,7 @@ export async function loadSessionHistory(sessionId: string): Promise<Message[]> 
 			throw new Error('Failed to load session history');
 		}
 
-		const data = await response.json();
+		const data = (await response.json()) as { success: boolean; history: any[] };
 		if (data.success && Array.isArray(data.history)) {
 			return data.history.map((msg: any) => ({
 				role: msg.role,
@@ -118,7 +118,7 @@ export async function deleteUserHistory(): Promise<boolean> {
 			throw new Error('Failed to delete session history');
 		}
 
-		const data = await response.json();
+		const data = (await response.json()) as { success: boolean };
 		return data.success;
 	} catch (err) {
 		console.error('Error deleting session history:', err);

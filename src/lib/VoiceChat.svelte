@@ -43,7 +43,7 @@
 	let audioProcessor: ScriptProcessorNode | null = null;
 	let messagesContainerRef = $state<HTMLDivElement>();
 	let showUserMenu = $state(false);
-	
+
 	// Session history tracking
 	let currentSessionId = $state(generateSessionId());
 
@@ -59,17 +59,18 @@
 	});
 
 	// Auto-connect on mount
-	onMount(async () => {
+	onMount(() => {
 		// Load session history if user is authenticated
 		if (session?.user?.id) {
-			try {
-				const history = await loadUserHistory(50); // Load last 50 messages
-				if (history.length > 0) {
-					transcript = history;
-				}
-			} catch (err) {
-				console.error('Failed to load session history:', err);
-			}
+			loadUserHistory(50)
+				.then((history) => {
+					if (history.length > 0) {
+						transcript = history;
+					}
+				})
+				.catch((err) => {
+					console.error('Failed to load session history:', err);
+				});
 		}
 
 		connectWebSocket();
@@ -299,7 +300,7 @@
 				isRecording = false;
 				isVoiceMode = false;
 				console.log('Disconnected from AI chat');
-				
+
 				// If connection was rejected due to authentication (401)
 				if (event.code === 1008 || event.reason?.includes('Authentication')) {
 					error = 'Authentication required. Please sign in.';
@@ -590,12 +591,12 @@
 
 	function addTranscript(role: string, text: string) {
 		transcript = [...transcript, { role, text }];
-		
+
 		// Save to database if user is authenticated
 		if (session?.user?.id && role !== 'system') {
 			saveMessage(currentSessionId, role as 'user' | 'assistant', text, {
 				repository
-			}).catch(err => console.error('Failed to save message:', err));
+			}).catch((err) => console.error('Failed to save message:', err));
 		}
 	}
 
@@ -725,8 +726,17 @@
 			<h1 class="logo">Apollo</h1>
 			{#if session?.user && repository}
 				<button onclick={changeRepo} class="repo-badge" title={repository}>
-					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="16"
+						height="16"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+						></path>
 					</svg>
 					<span>{repoName}</span>
 				</button>
@@ -769,16 +779,26 @@
 			{/if}
 			{#if session?.user}
 				<div class="user-menu-container">
-					<button 
-						class="user-pill" 
-						onclick={() => showUserMenu = !showUserMenu}
+					<button
+						class="user-pill"
+						onclick={() => (showUserMenu = !showUserMenu)}
 						title={session.user.name || session.user.username || 'User menu'}
 					>
 						{#if session.user.image}
 							<img src={session.user.image} alt={session.user.name || 'User'} class="user-avatar" />
 						{/if}
 						<span class="user-name">{session.user.name || session.user.username}</span>
-						<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron" class:open={showUserMenu}>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="14"
+							height="14"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							class="chevron"
+							class:open={showUserMenu}
+						>
 							<polyline points="6 9 12 15 18 9"></polyline>
 						</svg>
 					</button>

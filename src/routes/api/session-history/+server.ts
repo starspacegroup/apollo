@@ -70,7 +70,12 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 		}
 
 		// Parse request body
-		const body = await request.json();
+		const body = (await request.json()) as {
+			session_id: string;
+			role: string;
+			content: string;
+			metadata?: Record<string, any>;
+		};
 		const { session_id, role, content, metadata } = body;
 
 		// Validate required fields
@@ -92,7 +97,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 		await sessionHistoryService.saveMessage({
 			user_id: session.user.id,
 			session_id,
-			role,
+			role: role as 'user' | 'assistant' | 'system',
 			content,
 			metadata: metadata ? JSON.stringify(metadata) : undefined
 		});

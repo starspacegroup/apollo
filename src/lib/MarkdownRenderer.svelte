@@ -21,13 +21,33 @@
 				const DOMPurify = module.default;
 				renderedHTML = DOMPurify.sanitize(parsed, {
 					ALLOWED_TAGS: [
-						'p', 'br', 'strong', 'em', 'u', 'code', 'pre',
-						'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-						'ul', 'ol', 'li',
+						'p',
+						'br',
+						'strong',
+						'em',
+						'u',
+						'code',
+						'pre',
+						'h1',
+						'h2',
+						'h3',
+						'h4',
+						'h5',
+						'h6',
+						'ul',
+						'ol',
+						'li',
 						'blockquote',
-						'a', 'img',
-						'table', 'thead', 'tbody', 'tr', 'th', 'td',
-						'span', 'div'
+						'a',
+						'img',
+						'table',
+						'thead',
+						'tbody',
+						'tr',
+						'th',
+						'td',
+						'span',
+						'div'
 					],
 					ALLOWED_ATTR: ['href', 'target', 'rel', 'src', 'alt', 'class', 'title']
 				});

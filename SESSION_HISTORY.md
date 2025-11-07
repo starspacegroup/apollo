@@ -15,6 +15,7 @@ Apollo now stores your chat session history in a database, providing a seamless 
 ### What Gets Stored
 
 Each message in your conversation is stored with:
+
 - **User ID**: Your GitHub user ID (from OAuth)
 - **Session ID**: A unique identifier for each conversation session
 - **Role**: Whether the message is from you (`user`), the AI (`assistant`), or the system (`system`)
@@ -25,6 +26,7 @@ Each message in your conversation is stored with:
 ### Cross-Device Consistency
 
 When you log in with GitHub:
+
 1. Your previous conversations are automatically loaded
 2. New messages are saved to the database in real-time
 3. Your conversation history is available on any device where you log in
@@ -36,24 +38,26 @@ When you log in with GitHub:
 Retrieve session history for the authenticated user.
 
 **Query Parameters:**
+
 - `session_id` (optional): Get messages for a specific session
 - `limit` (optional): Maximum number of messages to return (default: 100)
 
 **Response:**
+
 ```json
 {
-  "success": true,
-  "history": [
-    {
-      "id": 1,
-      "user_id": "12345",
-      "session_id": "session_1699...",
-      "role": "user",
-      "content": "Hello, how can I create a GitHub issue?",
-      "created_at": 1699360000,
-      "metadata": "{\"repository\":\"owner/repo\"}"
-    }
-  ]
+	"success": true,
+	"history": [
+		{
+			"id": 1,
+			"user_id": "12345",
+			"session_id": "session_1699...",
+			"role": "user",
+			"content": "Hello, how can I create a GitHub issue?",
+			"created_at": 1699360000,
+			"metadata": "{\"repository\":\"owner/repo\"}"
+		}
+	]
 }
 ```
 
@@ -62,22 +66,24 @@ Retrieve session history for the authenticated user.
 Save a message to session history.
 
 **Request Body:**
+
 ```json
 {
-  "session_id": "session_1699...",
-  "role": "user",
-  "content": "Hello, how can I create a GitHub issue?",
-  "metadata": {
-    "repository": "owner/repo"
-  }
+	"session_id": "session_1699...",
+	"role": "user",
+	"content": "Hello, how can I create a GitHub issue?",
+	"metadata": {
+		"repository": "owner/repo"
+	}
 }
 ```
 
 **Response:**
+
 ```json
 {
-  "success": true,
-  "message": "Message saved successfully"
+	"success": true,
+	"message": "Message saved successfully"
 }
 ```
 
@@ -86,10 +92,11 @@ Save a message to session history.
 Delete all session history for the authenticated user.
 
 **Response:**
+
 ```json
 {
-  "success": true,
-  "message": "Session history deleted successfully"
+	"success": true,
+	"message": "Session history deleted successfully"
 }
 ```
 
@@ -126,24 +133,27 @@ CREATE INDEX idx_user_created ON session_history(user_id, created_at DESC);
 ### Production Deployment
 
 1. **Create D1 Database**:
+
    ```bash
    npx wrangler d1 create apollo-session-db
    ```
 
 2. **Update wrangler.jsonc**: Replace the `database_id` in `wrangler.jsonc` with the ID returned from the create command:
+
    ```jsonc
    {
-     "d1_databases": [
-       {
-         "binding": "DB",
-         "database_name": "apollo-session-db",
-         "database_id": "your-database-id-here"
-       }
-     ]
+   	"d1_databases": [
+   		{
+   			"binding": "DB",
+   			"database_name": "apollo-session-db",
+   			"database_id": "your-database-id-here"
+   		}
+   	]
    }
    ```
 
 3. **Run Migrations** (if needed):
+
    ```bash
    npx wrangler d1 execute apollo-session-db --file=./migrations/0001_create_session_history.sql
    ```
