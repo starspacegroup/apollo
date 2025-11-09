@@ -1,16 +1,24 @@
 ﻿<script lang="ts">
-import type { PageData } from './';
+import type { PageData } from './$types';
 import RepoSelector from '$lib/RepoSelector.svelte';
-import VoiceChat from '$lib/VoiceChat.svelte';
+import LiveChat from '$lib/LiveChat.svelte';
 import { repoStore } from '$lib/stores/repoStore';
+import { sessionStore, currentSession } from '$lib/stores/sessionStore';
 import { signIn } from '@auth/sveltekit/client';
+import { goto } from '$app/navigation';
+import { onMount } from 'svelte';
 
 let { data }: { data: PageData } = $props();
 const session = $derived(data.session);
 let repoSelector: any = $state();
 
+// Clear current session when on root page to ensure fresh chat
+onMount(() => {
+	sessionStore.clearCurrentSession();
+});
+
 function changeRepo() {
-repoSelector?.openModal();
+	repoSelector?.openModal();
 }
 </script>
 
@@ -22,7 +30,7 @@ repoSelector?.openModal();
 <RepoSelector {session} bind:this={repoSelector} />
 
 <div class="app-container">
-<VoiceChat repository={$repoStore || ''} {session} {changeRepo} />
+<LiveChat repository={$repoStore || ''} {session} {changeRepo} />
 </div>
 {:else}
 <div class="login-container">

@@ -162,7 +162,7 @@ npm run deploy
 ### Architecture
 
 1. **Frontend (SvelteKit)** - Main application
-   - `VoiceChat.svelte` - Chat interface with voice/text capabilities
+   - `LiveChat.svelte` - Chat interface with voice/text capabilities
    - `RepoSelector.svelte` - Repository selection modal
    - Captures microphone input using Web Audio API
    - Converts audio to PCM16 format

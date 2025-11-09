@@ -2,6 +2,8 @@
 	import { repoStore } from './stores/repoStore';
 	import { onMount } from 'svelte';
 	import { signIn } from '@auth/sveltekit/client';
+	import { goto } from '$app/navigation';
+	import { browser } from '$app/environment';
 
 	interface GitHubRepo {
 		id: number;
@@ -175,11 +177,17 @@
 	}
 
 	function selectRepo(fullName: string) {
+		const currentRepo = repoStore.get();
 		repoStore.set(fullName);
 		isOpen = false;
 		repoInput = '';
 		error = '';
 		searchQuery = '';
+		
+		// If switching to a different repo and not on home page, navigate to home
+		if (browser && currentRepo !== fullName && window.location.pathname !== '/') {
+			goto('/');
+		}
 	}
 
 	async function handleSubmit() {
@@ -193,10 +201,16 @@
 
 		const isValid = await validateRepo(trimmedRepo);
 		if (isValid) {
+			const currentRepo = repoStore.get();
 			repoStore.set(trimmedRepo);
 			isOpen = false;
 			repoInput = '';
 			error = '';
+			
+			// If switching to a different repo and not on home page, navigate to home
+			if (browser && currentRepo !== trimmedRepo && window.location.pathname !== '/') {
+				goto('/');
+			}
 		}
 	}
 
@@ -660,7 +674,6 @@
 		width: 100%;
 		padding: 1rem;
 		border: none;
-		border-bottom: 1px solid var(--modal-repo-list-border);
 		background: var(--modal-repo-item-bg);
 		text-align: left;
 		cursor: pointer;
@@ -734,7 +747,6 @@
 		text-align: center;
 		color: var(--modal-text-secondary);
 		font-size: 0.875rem;
-		border-top: 1px solid var(--modal-repo-list-border);
 		background: var(--modal-count-bg);
 	}
 

@@ -9,18 +9,33 @@ import {
 	createGitHubIssue,
 	searchRepositoryCode,
 	addIssueComment,
-	updateGitHubIssue
+	updateGitHubIssue,
+	getRepositoryTree
 } from '$lib/github-helpers';
 
-const GITHUB_ASSISTANT_SYSTEM_PROMPT = `You are Apollo, an AI assistant for GitHub repository management and development.
+const GITHUB_ASSISTANT_SYSTEM_PROMPT = `You are Apollo, a GitHub assistant with direct access to repository tools.
 
 {{REPO_CONTEXT}}
 
+You have these tools available - use them when needed:
+- get_repository_summary
+- list_issues
+- create_issue  
+- search_code
+- add_issue_comment
+- update_issue
+- get_repository_tree
+
+When users ask you to do something, call the appropriate tool immediately. Don't ask for permission or describe what you would do - just execute the tool.
+
+Examples:
+- "list issues" → call list_issues()
+- "search for auth" → call search_code(query="auth")
+- "create issue..." → call create_issue(title="...", body="...")
+
 {{ASSISTANT_INSTRUCTIONS}}
 
-{{LEGACY_CONTEXT}}
-
-Important: When users ask you to perform GitHub operations (create issues, search code, etc.), you should naturally guide them through the process in conversation. The actual API calls will be made through the application interface based on user confirmation.`;
+{{LEGACY_CONTEXT}}`;
 
 async function setupOpenAIConnection(
 	clientWs: any,
@@ -47,14 +62,42 @@ async function setupOpenAIConnection(
 
 	// Forward messages from OpenAI to client and handle tool calls
 	openaiWs.addEventListener('message', async (event: any) => {
+		// Early return if client has disconnected - don't process messages for closed connections
+		if (clientWs.readyState !== WebSocket.OPEN) {
+			console.log('Client disconnected, skipping message processing');
+			return;
+		}
+
 		const message = JSON.parse(event.data);
 
-		// Handle function/tool calls
-		if (message.type === 'response.function_call_arguments.done') {
-			const functionName = message.name;
-			const args = JSON.parse(message.arguments || '{}');
+		// Log all message types for debugging (except audio data)
+		if (message.type && !message.type.includes('audio')) {
+			console.log('OpenAI message type:', message.type);
+			// Log more details for responses
+			if (message.type.includes('response')) {
+				console.log('Response details:', JSON.stringify(message, null, 2).substring(0, 500));
+			}
+		}
 
-			console.log('Tool call:', functionName, args);
+		// Handle function/tool calls - check for the correct event type from OpenAI Realtime API
+		// The event is response.output_item.added when a function call is added
+		// Then response.output_item.done when it's complete
+		if (message.type === 'response.output_item.added' && message.item?.type === 'function_call') {
+			console.log('Function call item added:', message.item);
+		}
+
+		if (message.type === 'response.output_item.done' && message.item?.type === 'function_call') {
+			const functionName = message.item.name;
+			const args = JSON.parse(message.item.arguments || '{}');
+			const callId = message.item.call_id;
+
+			console.log('Tool call executing:', functionName, 'with args:', args);
+
+			// Check if client is still connected before executing potentially slow tool calls
+			if (clientWs.readyState !== WebSocket.OPEN) {
+				console.log('Client disconnected, skipping tool execution');
+				return;
+			}
 
 			try {
 				let result: any = null;
@@ -115,8 +158,27 @@ async function setupOpenAIConnection(
 						result = { success: true, message: 'Comment added successfully' };
 						break;
 
+					case 'update_issue':
+						const updates: any = {};
+						if (args.title) updates.title = args.title;
+						if (args.body) updates.body = args.body;
+						if (args.state) updates.state = args.state;
+						if (args.labels) updates.labels = args.labels;
+						result = await updateGitHubIssue(accessToken, owner, repo, args.issue_number, updates);
+						break;
+
+					case 'get_repository_tree':
+						result = await getRepositoryTree(accessToken, owner, repo, args.branch);
+						break;
+
 					default:
 						throw new Error(`Unknown function: ${functionName}`);
+				}
+
+				// Check if client disconnected during tool execution
+				if (clientWs.readyState !== WebSocket.OPEN) {
+					console.log('Client disconnected during tool execution, not sending result');
+					return;
 				}
 
 				// Send function result back to OpenAI
@@ -124,7 +186,7 @@ async function setupOpenAIConnection(
 					type: 'conversation.item.create',
 					item: {
 						type: 'function_call_output',
-						call_id: message.call_id,
+						call_id: callId,
 						output: JSON.stringify(result)
 					}
 				};
@@ -139,13 +201,15 @@ async function setupOpenAIConnection(
 					type: 'conversation.item.create',
 					item: {
 						type: 'function_call_output',
-						call_id: message.call_id,
+						call_id: callId,
 						output: JSON.stringify({
 							error: error instanceof Error ? error.message : 'Unknown error'
 						})
 					}
 				};
 				openaiWs.send(JSON.stringify(errorOutput));
+				// Trigger response even on error
+				openaiWs.send(JSON.stringify({ type: 'response.create' }));
 			}
 		}
 
@@ -162,12 +226,11 @@ async function setupOpenAIConnection(
 		// Set repository context if repository is provided (without downloading contents)
 		let repoContext = '';
 		if (repository) {
-			repoContext = `You are currently working with the GitHub repository: ${repository}\n\n`;
-			repoContext +=
-				'You can help users plan and structure their GitHub issues, search code, and manage the repository.\n\n';
+			const [owner, repo] = repository.split('/');
+			repoContext = `Connected to repository: ${repository} (owner: ${owner}, repo: ${repo})\n`;
+			repoContext += `All tools are configured for this repository. Just call them.\n\n`;
 		} else {
-			repoContext =
-				'No repository is currently selected. You can still help users plan and structure their GitHub issues.\n\n';
+			repoContext = 'No repository selected.\n\n';
 		}
 
 		const instructions = GITHUB_ASSISTANT_SYSTEM_PROMPT.replace('{{REPO_CONTEXT}}', repoContext)
@@ -267,6 +330,53 @@ async function setupOpenAIConnection(
 					},
 					required: ['issue_number', 'comment']
 				}
+			},
+			{
+				type: 'function',
+				name: 'update_issue',
+				description: 'Update an existing GitHub issue (title, body, state, or labels)',
+				parameters: {
+					type: 'object',
+					properties: {
+						issue_number: {
+							type: 'number',
+							description: 'Issue number to update'
+						},
+						title: {
+							type: 'string',
+							description: 'New issue title (optional)'
+						},
+						body: {
+							type: 'string',
+							description: 'New issue body/description in markdown format (optional)'
+						},
+						state: {
+							type: 'string',
+							enum: ['open', 'closed'],
+							description: 'New issue state (optional)'
+						},
+						labels: {
+							type: 'array',
+							items: { type: 'string' },
+							description: 'New labels for the issue (optional)'
+						}
+					},
+					required: ['issue_number']
+				}
+			},
+			{
+				type: 'function',
+				name: 'get_repository_tree',
+				description: 'Get the file tree structure of the repository to see all files and folders',
+				parameters: {
+					type: 'object',
+					properties: {
+						branch: {
+							type: 'string',
+							description: 'Branch name (optional, defaults to default branch)'
+						}
+					}
+				}
 			}
 		];
 
@@ -288,10 +398,15 @@ async function setupOpenAIConnection(
 					prefix_padding_ms: 300,
 					silence_duration_ms: 800
 				},
-				tools
+				tools,
+				tool_choice: 'auto' // Enable automatic tool calling
 			}
 		};
 
+		console.log('Sending session config with', tools.length, 'tools for repository:', repository);
+		console.log('Tool choice:', sessionConfig.session.tool_choice);
+		console.log('Tools:', tools.map(t => t.name).join(', '));
+		console.log('Instructions length:', instructions.length);
 		openaiWs.send(JSON.stringify(sessionConfig));
 	});
 
@@ -307,7 +422,10 @@ async function setupOpenAIConnection(
 	openaiWs.addEventListener('close', (event: any) => {
 		console.log('OpenAI connection closed:', event.code, event.reason);
 		if (clientWs.readyState === WebSocket.OPEN) {
-			clientWs.close(event.code, event.reason);
+			// Use a valid close code (1000 = normal closure, or 1001-1003 for other cases)
+			// Don't use reserved codes like 1005, 1006, etc.
+			const closeCode = event.code >= 1000 && event.code <= 1003 ? event.code : 1000;
+			clientWs.close(closeCode, event.reason || 'Connection closed');
 		}
 	});
 
@@ -315,7 +433,9 @@ async function setupOpenAIConnection(
 	clientWs.addEventListener('close', (event: any) => {
 		console.log('Client connection closed:', event.code, event.reason);
 		if (openaiWs.readyState === WebSocket.OPEN) {
-			openaiWs.close(event.code, event.reason);
+			// Use a valid close code
+			const closeCode = event.code >= 1000 && event.code <= 1003 ? event.code : 1000;
+			openaiWs.close(closeCode, event.reason || 'Connection closed');
 		}
 	});
 }
@@ -351,7 +471,36 @@ export const GET: RequestHandler = async ({ request, platform, url, locals }) =>
 	const [client, server] = Object.values(webSocketPair);
 	server.accept();
 
-	setupOpenAIConnection(server, OPENAI_API_KEY, repository, accessToken);
+	// Only setup OpenAI connection if repository is selected
+	if (repository) {
+		console.log('Client connected to voice WebSocket for repository:', repository);
+		setupOpenAIConnection(server, OPENAI_API_KEY, repository, accessToken);
+	} else {
+		// Send error message immediately since WebSocket is already accepted
+		setTimeout(() => {
+			if (server.readyState === WebSocket.OPEN) {
+				server.send(
+					JSON.stringify({
+						type: 'error',
+						error: { message: 'Please select a repository to start chatting' }
+					})
+				);
+			}
+		}, 0);
+
+		// Listen for messages from client but don't forward anywhere
+		server.addEventListener('message', (event: any) => {
+			// Client trying to send messages without a repository selected
+			if (server.readyState === WebSocket.OPEN) {
+				server.send(
+					JSON.stringify({
+						type: 'error',
+						error: { message: 'Please select a repository to start chatting' }
+					})
+				);
+			}
+		});
+	}
 
 	return new Response(null, {
 		status: 101,

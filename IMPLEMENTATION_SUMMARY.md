@@ -32,7 +32,7 @@ needing to clone or download it.
    - Added GitHub operation execution
    - Enhanced system prompts
 
-3. **`src/lib/VoiceChat.svelte`** - UI enhancements:
+3. **`src/lib/LiveChat.svelte`** - UI enhancements:
    - Added GitHub event handlers
    - Added system message support for notifications
    - Added success/error feedback for GitHub operations
@@ -211,7 +211,7 @@ apollo-app-sveltekit/
 ├── src/
 │   ├── lib/
 │   │   ├── github-helpers.ts          [ENHANCED]
-│   │   └── VoiceChat.svelte           [ENHANCED]
+│   │   └── LiveChat.svelte           [ENHANCED]
 │   └── routes/
 │       └── api/
 │           ├── github/

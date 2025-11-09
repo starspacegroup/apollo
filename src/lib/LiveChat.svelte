@@ -1,17 +1,24 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { browser } from '$app/environment';
 	import MarkdownRenderer from './MarkdownRenderer.svelte';
+	import SessionsPanel from './SessionsPanel.svelte';
 	import { signIn, signOut } from '@auth/sveltekit/client';
+	import { sessionStore, currentSession, type ChatSession, type ChatMessage } from './stores/sessionStore';
+	import { repoStore } from './stores/repoStore';
+	import { goto } from '$app/navigation';
 
 	// Accept repository as a prop
 	let {
 		repository = '',
 		session = null,
-		changeRepo = () => {}
+		changeRepo = () => {},
+		sessionId = undefined
 	}: {
 		repository?: string;
 		session?: any;
 		changeRepo?: () => void;
+		sessionId?: string;
 	} = $props();
 
 	// Extract repository name without org prefix
@@ -28,6 +35,7 @@
 	let error = $state('');
 	let isLoadingRepo = $state(false);
 	let repoLoadStatus = $state('');
+	// Transcript now comes from session store, but we keep local state for reactivity
 	let transcript = $state<Array<{ role: string; text: string }>>([]);
 	let audioWorklet: AudioWorkletNode | null = null;
 	let audioQueue: Array<ArrayBuffer> = [];
@@ -41,7 +49,11 @@
 	let textInputRef = $state<HTMLTextAreaElement>();
 	let audioProcessor: ScriptProcessorNode | null = null;
 	let messagesContainerRef = $state<HTMLDivElement>();
-	let showUserMenu = $state(false);
+	let connectedRepository = $state(''); // Track which repository we're connected to
+	let isIntentionalDisconnect = false; // Track if disconnect is intentional (e.g., switching repos)
+	let sidebarCollapsed = $state(false); // Track sidebar collapsed state
+	let inputCentered = $state(true); // Track if input should be centered (true when no messages)
+	let isNavigatingToSession = false; // Track if we're navigating after sending first message
 
 	// Auto-scroll to bottom when transcript changes
 	$effect(() => {
@@ -54,45 +66,171 @@
 		}
 	});
 
-	// Auto-connect on mount
-	onMount(() => {
-		connectWebSocket();
-
-		// Close user menu when clicking outside
-		const handleClickOutside = (e: MouseEvent) => {
-			const target = e.target as HTMLElement;
-			if (!target.closest('.user-menu-container')) {
-				showUserMenu = false;
+	// Reconnect when repository changes
+	$effect(() => {
+		console.log('Repository effect triggered:', { repository, connectedRepository, sessionId });
+		
+		// Clear any previous errors when switching sessions
+		error = '';
+		
+		// If sessionId is provided, switch to that session
+		if (sessionId) {
+			const currentSession = sessionStore.getCurrentSession();
+			if (!currentSession || currentSession.id !== sessionId) {
+				sessionStore.switchSession(sessionId);
 			}
-		};
+			
+			// Load transcript from session when sessionId is provided
+			const sessionData = sessionStore.getCurrentSession();
+			if (sessionData) {
+				// Convert ChatMessage[] to transcript format
+				transcript = sessionData.messages.map(msg => ({
+					role: msg.role,
+					text: msg.text
+				}));
+			}
+		}
+		
+		// Only reconnect if repository actually changed
+		if (repository !== connectedRepository) {
+			if (repository) {
+				// Check if we already have a working connection to this repo
+				const hasWorkingConnection = ws && ws.readyState === WebSocket.OPEN && connectedRepository === repository;
+				
+				if (hasWorkingConnection) {
+					console.log('WebSocket already connected to this repository, skipping reconnect');
+				} else {
+					// Repository was selected or changed
+					console.log('Repository changed, connecting to:', repository);
+					
+					// Clear transcript when switching repos (unless we have a sessionId)
+					if (!sessionId) {
+						transcript = [];
+					}
+					
+					// Connect to the new repository
+					connectWebSocket();
+				}
+				
+				// Focus the text input when repository is selected
+				setTimeout(() => {
+					textInputRef?.focus();
+				}, 100);
+			} else {
+				// Repository was cleared, disconnect
+				console.log('Repository cleared, disconnecting');
+				if (ws) {
+					isIntentionalDisconnect = true; // Mark as intentional
+					ws.close();
+					ws = null;
+					isConnected = false;
+				}
+				connectedRepository = '';
+				transcript = [];
+				inputCentered = true; // Reset to centered when repository is cleared
+			}
+		}
+	});
 
-		document.addEventListener('click', handleClickOutside);
+	// Sync transcript to current session whenever it changes
+	$effect(() => {
+		if (transcript.length > 0 && $currentSession) {
+			// This effect runs when transcript changes
+			// We need to be careful not to create infinite loops
+			const sessionMessages = $currentSession.messages;
+			
+			// Only sync if transcript is different from session
+			// (to avoid circular updates)
+			const transcriptChanged = 
+				transcript.length !== sessionMessages.length ||
+				transcript.some((msg, idx) => 
+					!sessionMessages[idx] || 
+					msg.text !== sessionMessages[idx].text ||
+					msg.role !== sessionMessages[idx].role
+				);
 
-		return () => {
-			document.removeEventListener('click', handleClickOutside);
-		};
+			// This is handled by addTranscript and updateTranscript functions
+			// which directly call sessionStore methods
+		}
+	});
+
+	// Update input position based on transcript and voice mode
+	$effect(() => {
+		// Center input when there are no messages and not in voice mode
+		// Move to bottom when there are messages OR voice mode is active
+		inputCentered = transcript.length === 0 && !isVoiceMode;
+	});
+
+	// Auto-connect on mount only if repository is selected
+	onMount(() => {
+		// Connection will be handled by the $effect above
+		// Just setup cleanup handlers
 	});
 
 	async function connectWebSocket() {
-		if (ws && ws.readyState === WebSocket.OPEN) {
-			return; // Already connected
+		// Close existing connection if any
+		if (ws) {
+			isIntentionalDisconnect = true; // Mark as intentional before closing
+			ws.close();
+			ws = null;
+		}
+
+		if (!repository) {
+			// Don't connect if no repository is selected
+			connectedRepository = '';
+			return;
 		}
 
 		try {
-			error = '';
+			error = ''; // Clear any previous errors
+			isIntentionalDisconnect = false; // Reset flag for new connection
 
 			// Connect to WebSocket with repository parameter
 			const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-			const wsUrl = `${protocol}//${window.location.host}/api/voice${repository ? `?repo=${encodeURIComponent(repository)}` : ''}`;
+			const wsUrl = `${protocol}//${window.location.host}/api/voice?repo=${encodeURIComponent(repository)}`;
 			ws = new WebSocket(wsUrl);
 
-			ws.onopen = () => {
-				isConnected = true;
-				console.log('Connected to AI chat');
-				// Disable server VAD by default (enable only when voice chat starts)
-				setTimeout(() => disableServerVAD(), 500);
+			// Wait for the connection to open or fail
+			await new Promise<void>((resolve, reject) => {
+				const timeout = setTimeout(() => {
+					reject(new Error('Connection timeout'));
+				}, 10000); // 10 second timeout
+
+				const handleOpen = () => {
+					clearTimeout(timeout);
+					isConnected = true;
+					connectedRepository = repository; // Mark which repository we're connected to
+					console.log('Connected to AI chat for repository:', repository);
+					// Disable server VAD by default (enable only when voice chat starts)
+					setTimeout(() => disableServerVAD(), 500);
+					resolve();
+				};
+
+				const handleError = (event: Event) => {
+					clearTimeout(timeout);
+					console.error('WebSocket connection error:', event);
+					// Don't show error on intentional disconnects or when switching repos
+					// This prevents error alerts when navigating between sessions
+					if (!isIntentionalDisconnect) {
+						console.warn('WebSocket connection failed, will retry if needed');
+					}
+					reject(new Error('WebSocket connection failed'));
+				};
+
+				ws!.addEventListener('open', handleOpen, { once: true });
+				ws!.addEventListener('error', handleError, { once: true });
+			});
+
+			// Now set up the permanent message and error handlers after connection is established
+			ws.onerror = (event) => {
+				console.error('WebSocket error:', event);
+				// Only show error if not an intentional disconnect or repository switch
+				if (!isIntentionalDisconnect && repository === connectedRepository) {
+					error = 'Connection error occurred';
+				}
 			};
 
+			// Now set up the message handlers after connection is established
 			ws.onmessage = async (event) => {
 				const data = JSON.parse(event.data);
 				console.log('WebSocket message:', data.type, data);
@@ -238,6 +376,9 @@
 							if (lastUserIndex !== -1) {
 								transcript[lastUserIndex].text = data.transcript;
 								transcript = [...transcript];
+								
+								// Sync to session store - replace the placeholder
+								sessionStore.replaceLastMessage(data.transcript);
 							} else {
 								// Fallback: add if not found
 								addTranscript('user', data.transcript);
@@ -249,6 +390,13 @@
 						console.log('Response done:', data.response?.id);
 						processingResponse = false;
 						currentResponseId = null;
+						
+						// Navigate to session URL after response is complete (if on root path)
+						// But don't navigate if in voice mode to avoid disconnecting
+						if (typeof window !== 'undefined' && window.location.pathname === '/' && $currentSession && !isVoiceMode) {
+							console.log('Response complete, navigating to session URL');
+							goto(`/c/${$currentSession.id}`, { replaceState: true });
+						}
 						break;
 
 					case 'response.cancelled':
@@ -273,61 +421,74 @@
 				}
 			};
 
-			ws.onerror = (event) => {
-				console.error('WebSocket error:', event);
-				error = 'Connection error occurred';
-			};
-
 			ws.onclose = (event) => {
 				isConnected = false;
 				isRecording = false;
 				isVoiceMode = false;
+				const wasConnectedToRepo = connectedRepository;
+				connectedRepository = ''; // Clear connected repository on close
 				console.log('Disconnected from AI chat');
 				
 				// If connection was rejected due to authentication (401)
 				if (event.code === 1008 || event.reason?.includes('Authentication')) {
 					error = 'Authentication required. Please sign in.';
 				}
+				// Only show connection lost error if user was actively using the connection
+				// Don't show errors when switching sessions or navigating
+				else if (!isIntentionalDisconnect && processingResponse) {
+					error = 'Connection lost during response';
+				}
 			};
 		} catch (err) {
 			console.error('Error connecting:', err);
-			error = err instanceof Error ? err.message : 'Failed to connect';
+			// Only show error if we're not switching repos/sessions
+			if (!isIntentionalDisconnect) {
+				error = err instanceof Error ? err.message : 'Failed to connect';
+			}
 		}
 	}
 
 	function disableServerVAD() {
 		if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
-		// Disable server-side voice activity detection for text mode
-		console.log('Disabling server VAD for text mode');
-		ws.send(
-			JSON.stringify({
-				type: 'session.update',
-				session: {
-					turn_detection: null
-				}
-			})
-		);
+		try {
+			// Disable server-side voice activity detection for text mode
+			console.log('Disabling server VAD for text mode');
+			ws.send(
+				JSON.stringify({
+					type: 'session.update',
+					session: {
+						turn_detection: null
+					}
+				})
+			);
+		} catch (e) {
+			console.warn('Failed to disable server VAD:', e);
+		}
 	}
 
 	function enableServerVAD() {
 		if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
-		// Enable server-side voice activity detection for voice mode
-		console.log('Enabling server VAD for voice mode');
-		ws.send(
-			JSON.stringify({
-				type: 'session.update',
-				session: {
-					turn_detection: {
-						type: 'server_vad',
-						threshold: 0.6,
-						prefix_padding_ms: 300,
-						silence_duration_ms: 800
+		try {
+			// Enable server-side voice activity detection for voice mode
+			console.log('Enabling server VAD for voice mode');
+			ws.send(
+				JSON.stringify({
+					type: 'session.update',
+					session: {
+						turn_detection: {
+							type: 'server_vad',
+							threshold: 0.6,
+							prefix_padding_ms: 300,
+							silence_duration_ms: 800
+						}
 					}
-				}
-			})
-		);
+				})
+			);
+		} catch (e) {
+			console.warn('Failed to enable server VAD:', e);
+		}
 	}
 
 	async function startVoiceChat() {
@@ -335,28 +496,103 @@
 			error = '';
 			isConnecting = true;
 
-			// Connect WebSocket if not already connected
-			await connectWebSocket();
+			// Ensure we have a repository selected
+			if (!repository) {
+				error = 'Please select a repository first';
+				isConnecting = false;
+				return;
+			}
+
+			// Clean up any existing voice session state first
+			if (isVoiceMode) {
+				console.log('Cleaning up existing voice session before starting new one');
+				stopRecording();
+				// Wait a bit for cleanup
+				await new Promise(resolve => setTimeout(resolve, 100));
+			}
+
+			// Cancel any ongoing audio and reset state
+			cancelCurrentAudio();
+			audioQueue = [];
+			isPlayingAudio = false;
+			nextPlaybackTime = 0;
+			isSpeaking = false;
+			shouldCancelAudio = false;
+			processingResponse = false;
+			currentResponseId = null;
+
+			// Create a new session for voice chat (similar to text chat)
+			let currentSessionId = $currentSession?.id;
+			
+			if (!currentSessionId) {
+				console.log('Creating new session for voice chat');
+				currentSessionId = sessionStore.createSession(repository, undefined, true);
+			}
+
+			if (!currentSessionId) {
+				error = 'Failed to create session. Please try again.';
+				isConnecting = false;
+				return;
+			}
+
+			// Connect WebSocket if not already connected (this now waits for connection)
+			if (!ws || ws.readyState !== WebSocket.OPEN) {
+				await connectWebSocket();
+			}
 
 			// Request microphone access
 			mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-			// Create audio context
+			// Always create a fresh audio context for each voice session
 			audioContext = new AudioContext({ sampleRate: 24000 });
+			console.log('Created new audio context for voice session');
 
-			// Wait for connection to be ready
+			// Connection is now guaranteed to be open
 			if (ws && ws.readyState === WebSocket.OPEN) {
+				// Clear any previous conversation state before enabling voice mode
+				console.log('Clearing conversation state before starting voice session');
+				ws.send(JSON.stringify({ 
+					type: 'input_audio_buffer.clear'
+				}));
+
 				isVoiceMode = true;
 				enableServerVAD();
 				startRecording();
 
-				// Show bounce animation after connecting
+				// Stop the bounce animation after connecting
 				isConnecting = false;
+			} else {
+				throw new Error('WebSocket connection not ready');
 			}
 		} catch (err) {
 			console.error('Error starting voice chat:', err);
 			error = err instanceof Error ? err.message : 'Failed to start voice chat';
 			isConnecting = false;
+			
+			// Clean up if we failed
+			if (mediaStream) {
+				mediaStream.getTracks().forEach(track => track.stop());
+				mediaStream = null;
+			}
+			if (audioContext) {
+				audioContext.close();
+				audioContext = null;
+			}
+		}
+	}
+
+	// Export function to allow parent components to start voice mode
+	export function activateVoiceMode() {
+		if (!isVoiceMode && repository) {
+			// Create new session when activating voice mode from sidebar
+			if (!$currentSession) {
+				console.log('Creating new session when activating voice mode');
+				sessionStore.createSession(repository, undefined, true);
+			}
+			startVoiceChat();
+		} else if (!repository) {
+			console.warn('Cannot start voice mode: no repository selected');
+			error = 'Please select a repository first';
 		}
 	}
 
@@ -404,18 +640,38 @@
 	}
 
 	function stopRecording() {
+		console.log('Stopping recording and cleaning up audio resources');
+		
+		// Disconnect and clean up audio processor
 		if (audioProcessor) {
-			audioProcessor.disconnect();
+			try {
+				audioProcessor.disconnect();
+				audioProcessor.onaudioprocess = null;
+			} catch (e) {
+				console.warn('Error disconnecting audio processor:', e);
+			}
 			audioProcessor = null;
 		}
 
+		// Stop all media stream tracks
 		if (mediaStream) {
-			mediaStream.getTracks().forEach((track) => track.stop());
+			mediaStream.getTracks().forEach((track) => {
+				track.stop();
+				console.log('Stopped media track:', track.kind);
+			});
 			mediaStream = null;
 		}
 
-		if (audioContext) {
-			audioContext.close();
+		// Close audio context and set to null for clean restart
+		if (audioContext && audioContext.state !== 'closed') {
+			audioContext.close().then(() => {
+				console.log('Audio context closed');
+				audioContext = null;
+			}).catch((e) => {
+				console.warn('Error closing audio context:', e);
+				audioContext = null;
+			});
+		} else {
 			audioContext = null;
 		}
 
@@ -574,12 +830,30 @@
 
 	function addTranscript(role: string, text: string) {
 		transcript = [...transcript, { role, text }];
+		
+		// Only add to session store if we have an active session
+		// (session should already be created before calling this function)
+		if (!$currentSession) {
+			console.warn('No active session when adding transcript - message will not be saved');
+			return;
+		}
+		
+		// Sync to session store
+		const message: ChatMessage = {
+			role: role as 'user' | 'assistant' | 'system',
+			text,
+			timestamp: Date.now()
+		};
+		sessionStore.addMessage(message);
 	}
 
 	function updateTranscript(role: string, text: string) {
 		if (transcript.length > 0 && transcript[transcript.length - 1].role === role) {
 			transcript[transcript.length - 1].text += text;
 			transcript = [...transcript];
+			
+			// Sync to session store - update last message
+			sessionStore.updateLastMessage(text);
 		} else {
 			addTranscript(role, text);
 		}
@@ -590,6 +864,20 @@
 
 		const message = textMessage.trim();
 		textMessage = '';
+
+		// Ensure we have an active session - create one if needed
+		let currentSessionId = $currentSession?.id;
+		
+		if (!currentSessionId && repository) {
+			console.log('No active session when sending message, creating new session');
+			// Always skip navigation - we'll navigate after response.created
+			currentSessionId = sessionStore.createSession(repository, undefined, true);
+		}
+
+		if (!currentSessionId) {
+			error = 'Failed to create session. Please try again.';
+			return;
+		}
 
 		// Connect WebSocket if not already connected
 		if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -605,6 +893,11 @@
 
 		// Add user message to transcript immediately
 		addTranscript('user', message);
+
+		// Refocus the input field after sending
+		setTimeout(() => {
+			textInputRef?.focus();
+		}, 0);
 
 		// Cancel any ongoing response
 		if (processingResponse) {
@@ -644,6 +937,9 @@
 		// Request response from AI (explicit for text messages)
 		console.log('Requesting AI response for text message');
 		ws.send(JSON.stringify({ type: 'response.create' }));
+		
+		// Navigation will happen automatically in response.created handler
+		// This prevents interrupting the response stream
 	}
 
 	function handleKeyDown(event: KeyboardEvent) {
@@ -654,40 +950,131 @@
 	}
 
 	function stopVoiceChat() {
-		// Only stop recording, not the WebSocket connection
+		console.log('Stopping voice chat');
+		
+		// Clear any errors from the voice session
+		error = '';
+		
+		// Cancel any ongoing audio playback
+		cancelCurrentAudio();
+		
+		// Stop recording and clean up media resources
 		stopRecording();
 
-		// Clear audio queue
+		// Clear audio queue and reset playback state
 		audioQueue = [];
 		isPlayingAudio = false;
 		nextPlaybackTime = 0;
 		isSpeaking = false;
 		isConnecting = false;
+		shouldCancelAudio = false;
+
+		// Cancel any ongoing response
+		if (processingResponse && ws && ws.readyState === WebSocket.OPEN) {
+			try {
+				console.log('Canceling ongoing response when stopping voice chat');
+				ws.send(JSON.stringify({ type: 'response.cancel' }));
+			} catch (e) {
+				console.warn('Failed to cancel response:', e);
+			}
+			processingResponse = false;
+			currentResponseId = null;
+		}
+
+		// Clear the conversation to reset the session state
+		if (ws && ws.readyState === WebSocket.OPEN) {
+			try {
+				console.log('Clearing input audio buffer');
+				// Only clear the input audio buffer, don't truncate conversation
+				ws.send(JSON.stringify({ 
+					type: 'input_audio_buffer.clear'
+				}));
+			} catch (e) {
+				console.warn('Failed to clear audio buffer:', e);
+			}
+		}
 
 		// Disable server VAD for text chat mode
 		disableServerVAD();
+
+		// Navigate to session URL if we're still on root path and have a session
+		if (typeof window !== 'undefined' && window.location.pathname === '/' && $currentSession) {
+			console.log('Voice chat stopped, navigating to session URL');
+			goto(`/c/${$currentSession.id}`, { replaceState: true });
+		}
 
 		// Keep WebSocket connection for text chat
 	}
 
 	function disconnect() {
-		// Fully disconnect everything
+		console.log('Disconnecting and cleaning up all resources');
+		
+		// Cancel any ongoing audio and responses
+		cancelCurrentAudio();
+		
+		// Stop recording and clean up media resources
 		stopRecording();
 
+		// Close WebSocket connection
 		if (ws) {
-			ws.close();
+			isIntentionalDisconnect = true;
+			if (ws.readyState === WebSocket.OPEN) {
+				ws.close(1000, 'User disconnected');
+			}
 			ws = null;
 		}
 
-		// Clear audio queue
+		// Clear all audio and response state
 		audioQueue = [];
 		isPlayingAudio = false;
 		nextPlaybackTime = 0;
 		currentResponseId = null;
 		processingResponse = false;
+		shouldCancelAudio = false;
 
+		// Reset connection state
 		isConnected = false;
 		isSpeaking = false;
+		isVoiceMode = false;
+		isConnecting = false;
+	}
+
+	// Session handlers
+	function handleNewSession() {
+		if (!repository) {
+			// Can't create session without repository
+			error = 'Please select a repository first';
+			return;
+		}
+
+		// Create a new session for current repository
+		const newSessionId = sessionStore.createSession(repository);
+		
+		// Clear transcript to start fresh
+		transcript = [];
+		
+		// Clear any existing conversation state
+		if (ws && ws.readyState === WebSocket.OPEN) {
+			// Could send a clear conversation command if needed
+			console.log('Started new session:', newSessionId, 'for repository:', repository);
+		}
+		
+		// Session will appear in history once the first message is added
+		console.log('New session created, will appear in history after first message');
+		
+		// Focus the text input after creating a new session
+		setTimeout(() => {
+			textInputRef?.focus();
+		}, 0);
+	}
+
+	function handleSessionSelect(session: ChatSession) {
+		// Navigate to the session URL
+		goto(`/c/${session.id}`);
+	}
+
+	function toggleSidebar() {
+		sidebarCollapsed = !sidebarCollapsed;
 	}
 
 	onDestroy(() => {
@@ -696,122 +1083,114 @@
 </script>
 
 <div class="grok-container">
-	<!-- Top Navigation Bar -->
-	<nav class="top-nav">
-		<div class="nav-left">
-			<h1 class="logo">Apollo</h1>
-			{#if session?.user && repository}
-				<button onclick={changeRepo} class="repo-badge" title={repository}>
-					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-					</svg>
-					<span>{repoName}</span>
-				</button>
-			{/if}
-		</div>
-
-		<div class="nav-right">
-			{#if isLoadingRepo}
-				<div class="status-pill loading">
-					<span class="spinner"></span>
-					<span>{repoLoadStatus}</span>
-				</div>
-			{:else if repoLoadStatus}
-				<div class="status-pill success">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="16"
-						height="16"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<polyline points="20 6 9 17 4 12"></polyline>
-					</svg>
-					<span>{repoLoadStatus}</span>
-				</div>
-			{/if}
-			{#if isRecording}
-				<div class="status-pill recording">
-					<span class="pulse"></span>
-					<span>Listening</span>
-				</div>
-			{/if}
-			{#if isSpeaking}
-				<div class="status-pill speaking">
-					<span class="wave"></span>
-					<span>Speaking</span>
-				</div>
-			{/if}
-			{#if session?.user}
-				<div class="user-menu-container">
-					<button 
-						class="user-pill" 
-						onclick={() => showUserMenu = !showUserMenu}
-						title={session.user.name || session.user.username || 'User menu'}
-					>
-						{#if session.user.image}
-							<img src={session.user.image} alt={session.user.name || 'User'} class="user-avatar" />
-						{/if}
-						<span class="user-name">{session.user.name || session.user.username}</span>
-						<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron" class:open={showUserMenu}>
-							<polyline points="6 9 12 15 18 9"></polyline>
+	<!-- Left Sidebar - Chat History -->
+	{#if session?.user}
+		<SessionsPanel
+			onSessionSelect={handleSessionSelect}
+			onNewSession={handleNewSession}
+			onStartVoice={activateVoiceMode}
+			bind:isCollapsed={sidebarCollapsed}
+			{session}
+		/>
+	{/if}
+	
+	<!-- Main Content Area -->
+	<div class="main-content">
+		<!-- Top Navigation Bar -->
+		<nav class="top-nav">
+			<div class="nav-left">
+				<!-- Hamburger menu for mobile -->
+				{#if session?.user}
+					<button class="hamburger-btn" onclick={toggleSidebar} aria-label="Toggle sidebar">
+						<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<line x1="3" y1="12" x2="21" y2="12"></line>
+							<line x1="3" y1="6" x2="21" y2="6"></line>
+							<line x1="3" y1="18" x2="21" y2="18"></line>
 						</svg>
 					</button>
-
-					{#if showUserMenu}
-						<div class="user-dropdown">
-							<button
-								onclick={() => {
-									signOut();
-									showUserMenu = false;
-								}}
-								class="dropdown-item logout"
-							>
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									width="16"
-									height="16"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-								>
-									<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-									<polyline points="16 17 21 12 16 7"></polyline>
-									<line x1="21" y1="12" x2="9" y2="12"></line>
-								</svg>
-								<span>Sign out</span>
-							</button>
-						</div>
+				{/if}
+				
+				{#if session?.user}
+					{#if repository}
+						<button onclick={changeRepo} class="repo-badge connected" title="Connected to {repository}\nClick to change repository">
+							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+							</svg>
+							<span class="repo-full-name">{repository}</span>
+							{#if isConnected}
+								<span class="connection-indicator" title="Connected to AI"></span>
+							{/if}
+						</button>
+					{:else}
+						<button onclick={changeRepo} class="repo-badge select-repo" title="Select a repository to start">
+							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+							</svg>
+							<span>Select Repository</span>
+						</button>
 					{/if}
-				</div>
-			{:else}
-				<button onclick={() => signIn('github')} class="login-btn" title="Sign in with GitHub">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="18"
-						height="18"
-						viewBox="0 0 24 24"
-						fill="currentColor"
-					>
-						<path
-							d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
-						/>
-					</svg>
-					<span>Sign in with GitHub</span>
-				</button>
-			{/if}
+				{/if}
+			</div>
+
+			<div class="nav-right">
+				{#if isLoadingRepo}
+					<div class="status-pill loading">
+						<span class="spinner"></span>
+						<span>{repoLoadStatus}</span>
+					</div>
+				{:else if repoLoadStatus}
+					<div class="status-pill success">
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="16"
+							height="16"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<polyline points="20 6 9 17 4 12"></polyline>
+						</svg>
+						<span>{repoLoadStatus}</span>
+					</div>
+				{/if}
+				{#if isRecording}
+					<div class="status-pill recording">
+						<span class="pulse"></span>
+						<span>Listening</span>
+					</div>
+				{/if}
+				{#if isSpeaking}
+					<div class="status-pill speaking">
+						<span class="wave"></span>
+						<span>Speaking</span>
+					</div>
+				{/if}
 		</div>
 	</nav>
 
 	<!-- Main Chat Area -->
-	<div class="chat-area">
+	<div class="chat-area" class:input-centered={inputCentered}>
 		<div class="messages-container" bind:this={messagesContainerRef}>
-			{#if transcript.length === 0}
+			{#if !repository}
+				<div class="welcome-state">
+					<div class="welcome-icon">
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="64"
+							height="64"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.5"
+						>
+							<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+						</svg>
+					</div>
+					<h2>Select a Repository</h2>
+					<p>Choose a GitHub repository from the selector above to start chatting with Apollo</p>
+				</div>
+			{:else if transcript.length === 0}
 				<div class="welcome-state">
 					<div class="welcome-icon">
 						<svg
@@ -826,8 +1205,143 @@
 							<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
 						</svg>
 					</div>
-					<h2>How can I help you today?</h2>
-					<p>Ask me anything about your GitHub repository or start a voice conversation</p>
+					<h2>Connected to {repository}</h2>
+					
+					<!-- Input field directly below "Connected to" -->
+					{#if transcript.length === 0}
+					<div class="welcome-input-wrapper">
+						<textarea
+							bind:this={textInputRef}
+							bind:value={textMessage}
+							onkeydown={handleKeyDown}
+							placeholder="Message Apollo..."
+							rows="1"
+							class="message-input"
+						></textarea>
+
+						<button
+							class="send-btn"
+							onclick={sendTextMessage}
+							disabled={!textMessage.trim()}
+							title="Send message"
+						>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								width="20"
+								height="20"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<line x1="22" y1="2" x2="11" y2="13"></line>
+								<polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+							</svg>
+						</button>
+
+						<button
+							class="voice-btn"
+							class:connecting={isConnecting}
+							class:recording={isVoiceMode && isRecording}
+							class:speaking={isSpeaking}
+							class:active={isVoiceMode}
+							onclick={isVoiceMode ? stopVoiceChat : startVoiceChat}
+							title={isVoiceMode ? 'Stop voice chat' : 'Start voice chat'}
+						>
+							<div class="waveform-icon">
+								{#if isVoiceMode}
+									<!-- Stop icon when active -->
+									<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+										<rect width="8" height="8" x="6" y="6" rx="1.5"></rect>
+									</svg>
+								{:else}
+									<!-- Custom 5-bar waveform icon -->
+									<svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+										<rect
+											class="bar bar-1"
+											x="3"
+											y="8"
+											width="2.5"
+											height="8"
+											rx="1.25"
+											fill="currentColor"
+										></rect>
+										<rect
+											class="bar bar-2"
+											x="7.5"
+											y="5"
+											width="2.5"
+											height="14"
+											rx="1.25"
+											fill="currentColor"
+										></rect>
+										<rect
+											class="bar bar-3"
+											x="12"
+											y="3"
+											width="2.5"
+											height="18"
+											rx="1.25"
+											fill="currentColor"
+										></rect>
+										<rect
+											class="bar bar-4"
+											x="16.5"
+											y="5"
+											width="2.5"
+											height="14"
+											rx="1.25"
+											fill="currentColor"
+										></rect>
+										<rect
+											class="bar bar-5"
+											x="21"
+											y="8"
+											width="2.5"
+											height="8"
+											rx="1.25"
+											fill="currentColor"
+										></rect>
+									</svg>
+								{/if}
+							</div>
+						</button>
+					</div>
+					{/if}
+					
+					<p class="welcome-description">I can help you with:</p>
+					<div class="capabilities-list">
+						<div class="capability-item">
+							<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<circle cx="12" cy="12" r="10"></circle>
+								<path d="M12 16v-4"></path>
+								<path d="M12 8h.01"></path>
+							</svg>
+							<span>Creating and managing GitHub issues</span>
+						</div>
+						<div class="capability-item">
+							<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<circle cx="11" cy="11" r="8"></circle>
+								<path d="m21 21-4.35-4.35"></path>
+							</svg>
+							<span>Searching through your codebase</span>
+						</div>
+						<div class="capability-item">
+							<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+							</svg>
+							<span>Getting repository information and stats</span>
+						</div>
+						<div class="capability-item">
+							<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+							</svg>
+							<span>Adding comments to issues</span>
+						</div>
+					</div>
+					<p class="welcome-tip">Type a message or start a voice conversation to get started!</p>
 				</div>
 			{:else}
 				<div class="messages-list">
@@ -845,139 +1359,142 @@
 		</div>
 	</div>
 
-	<!-- Bottom Input Area -->
-	<div class="input-area">
-		{#if error}
-			<div class="error-banner">
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					width="16"
-					height="16"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-				>
-					<circle cx="12" cy="12" r="10"></circle>
-					<line x1="12" y1="8" x2="12" y2="12"></line>
-					<line x1="12" y1="16" x2="12.01" y2="16"></line>
-				</svg>
-				{error}
-			</div>
-		{/if}
-
-		<div class="input-wrapper">
-			<div class="input-controls">
-				<textarea
-					bind:this={textInputRef}
-					bind:value={textMessage}
-					onkeydown={handleKeyDown}
-					placeholder="Message Apollo..."
-					rows="1"
-					class="message-input"
-				></textarea>
-
-				<button
-					class="send-btn"
-					onclick={sendTextMessage}
-					disabled={!textMessage.trim()}
-					title="Send message"
-				>
+	<!-- Bottom Input Area - Shows when there are messages -->
+	{#if transcript.length > 0 && repository}
+		<div class="bottom-input-area">
+			{#if error}
+				<div class="error-banner">
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						width="20"
-						height="20"
+						width="16"
+						height="16"
 						viewBox="0 0 24 24"
 						fill="none"
 						stroke="currentColor"
 						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
 					>
-						<line x1="22" y1="2" x2="11" y2="13"></line>
-						<polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+						<circle cx="12" cy="12" r="10"></circle>
+						<line x1="12" y1="8" x2="12" y2="12"></line>
+						<line x1="12" y1="16" x2="12.01" y2="16"></line>
 					</svg>
-				</button>
+					{error}
+				</div>
+			{/if}
 
-				<button
-					class="voice-btn"
-					class:connecting={isConnecting}
-					class:recording={isVoiceMode && isRecording}
-					class:speaking={isSpeaking}
-					class:active={isVoiceMode}
-					onclick={isVoiceMode ? stopVoiceChat : startVoiceChat}
-					title={isVoiceMode ? 'Stop voice chat' : 'Start voice chat'}
-				>
-					<div class="waveform-icon">
-						{#if isVoiceMode}
-							<!-- Stop icon when active -->
-							<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-								<rect width="8" height="8" x="6" y="6" rx="1.5"></rect>
-							</svg>
-						{:else}
-							<!-- Custom 5-bar waveform icon -->
-							<svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-								<rect
-									class="bar bar-1"
-									x="3"
-									y="8"
-									width="2.5"
-									height="8"
-									rx="1.25"
-									fill="currentColor"
-								></rect>
-								<rect
-									class="bar bar-2"
-									x="7.5"
-									y="5"
-									width="2.5"
-									height="14"
-									rx="1.25"
-									fill="currentColor"
-								></rect>
-								<rect
-									class="bar bar-3"
-									x="12"
-									y="3"
-									width="2.5"
-									height="18"
-									rx="1.25"
-									fill="currentColor"
-								></rect>
-								<rect
-									class="bar bar-4"
-									x="16.5"
-									y="5"
-									width="2.5"
-									height="14"
-									rx="1.25"
-									fill="currentColor"
-								></rect>
-								<rect
-									class="bar bar-5"
-									x="21"
-									y="8"
-									width="2.5"
-									height="8"
-									rx="1.25"
-									fill="currentColor"
-								></rect>
-							</svg>
+			<div class="input-wrapper">
+				<div class="input-controls">
+					<textarea
+						bind:this={textInputRef}
+						bind:value={textMessage}
+						onkeydown={handleKeyDown}
+						placeholder="Message Apollo..."
+						rows="1"
+						class="message-input"
+					></textarea>
+
+					<button
+						class="send-btn"
+						onclick={sendTextMessage}
+						disabled={!textMessage.trim()}
+						title="Send message"
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="20"
+							height="20"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<line x1="22" y1="2" x2="11" y2="13"></line>
+							<polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+						</svg>
+					</button>
+
+					<button
+						class="voice-btn"
+						class:connecting={isConnecting}
+						class:recording={isVoiceMode && isRecording}
+						class:speaking={isSpeaking}
+						class:active={isVoiceMode}
+						onclick={isVoiceMode ? stopVoiceChat : startVoiceChat}
+						title={isVoiceMode ? 'Stop voice chat' : 'Start voice chat'}
+					>
+						<div class="waveform-icon">
+							{#if isVoiceMode}
+								<!-- Stop icon when active -->
+								<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+									<rect width="8" height="8" x="6" y="6" rx="1.5"></rect>
+								</svg>
+							{:else}
+								<!-- Custom 5-bar waveform icon -->
+								<svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+									<rect
+										class="bar bar-1"
+										x="3"
+										y="8"
+										width="2.5"
+										height="8"
+										rx="1.25"
+										fill="currentColor"
+									></rect>
+									<rect
+										class="bar bar-2"
+										x="7.5"
+										y="5"
+										width="2.5"
+										height="14"
+										rx="1.25"
+										fill="currentColor"
+									></rect>
+									<rect
+										class="bar bar-3"
+										x="12"
+										y="3"
+										width="2.5"
+										height="18"
+										rx="1.25"
+										fill="currentColor"
+									></rect>
+									<rect
+										class="bar bar-4"
+										x="16.5"
+										y="5"
+										width="2.5"
+										height="14"
+										rx="1.25"
+										fill="currentColor"
+									></rect>
+									<rect
+										class="bar bar-5"
+										x="21"
+										y="8"
+										width="2.5"
+										height="8"
+										rx="1.25"
+										fill="currentColor"
+									></rect>
+								</svg>
+							{/if}
+						</div>
+						{#if isVoiceMode && isRecording}
+							<div class="pulse-ring"></div>
 						{/if}
-					</div>
-					{#if isVoiceMode && isRecording}
-						<div class="pulse-ring"></div>
-					{/if}
-				</button>
+					</button>
+				</div>
 			</div>
 		</div>
+	{/if}
 	</div>
 </div>
 
 <style>
 	.grok-container {
 		display: flex;
-		flex-direction: column;
+		flex-direction: row;
 		height: 100vh;
 		/* Use dynamic viewport height on mobile to account for browser UI */
 		height: 100dvh;
@@ -987,6 +1504,14 @@
 		font-family:
 			-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
 	}
+	
+	/* Main Content Area - takes rest of space */
+	.main-content {
+		display: flex;
+		flex-direction: column;
+		flex: 1;
+		min-width: 0; /* Allow flexbox to shrink */
+	}
 
 	/* Top Navigation */
 	.top-nav {
@@ -995,7 +1520,6 @@
 		align-items: center;
 		padding: 0.75rem 1rem;
 		background: #111111;
-		border-bottom: 1px solid #222222;
 		height: 60px;
 		flex-shrink: 0;
 		/* Add safe area for notches */
@@ -1010,14 +1534,34 @@
 		gap: 1rem;
 	}
 
-	.logo {
-		font-size: 1.25rem;
-		font-weight: 700;
-		margin: 0;
-		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-		-webkit-background-clip: text;
-		-webkit-text-fill-color: transparent;
-		background-clip: text;
+	/* Hamburger menu button - only visible on mobile */
+	.hamburger-btn {
+		display: none;
+		align-items: center;
+		justify-content: center;
+		width: 40px;
+		height: 40px;
+		padding: 0;
+		background: transparent;
+		border: none;
+		color: #e5e5e5;
+		cursor: pointer;
+		border-radius: 0.5rem;
+		transition: all 0.2s;
+	}
+
+	.hamburger-btn:hover {
+		background: #2a2a2a;
+	}
+
+	.hamburger-btn:active {
+		background: #333;
+	}
+
+	@media (max-width: 768px) {
+		.hamburger-btn {
+			display: flex;
+		}
 	}
 
 	.repo-badge {
@@ -1032,12 +1576,58 @@
 		font-size: 0.875rem;
 		cursor: pointer;
 		transition: all 0.2s;
+		position: relative;
+	}
+
+	.repo-badge.connected {
+		border-color: rgba(16, 185, 129, 0.3);
+		background: rgba(16, 185, 129, 0.05);
+	}
+
+	.repo-badge .repo-full-name {
+		color: #e5e5e5;
+		font-weight: 500;
+	}
+
+	.connection-indicator {
+		width: 8px;
+		height: 8px;
+		background: #10b981;
+		border-radius: 50%;
+		animation: pulse-glow 2s ease-in-out infinite;
+	}
+
+	@keyframes pulse-glow {
+		0%, 100% {
+			opacity: 1;
+			box-shadow: 0 0 4px rgba(16, 185, 129, 0.6);
+		}
+		50% {
+			opacity: 0.6;
+			box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);
+		}
 	}
 
 	.repo-badge:hover {
 		background: #222222;
 		border-color: #444444;
 		color: #e5e5e5;
+	}
+
+	.repo-badge.connected:hover {
+		background: rgba(16, 185, 129, 0.1);
+		border-color: rgba(16, 185, 129, 0.4);
+	}
+
+	.repo-badge.select-repo {
+		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		border-color: transparent;
+		color: #ffffff;
+	}
+
+	.repo-badge.select-repo:hover {
+		opacity: 0.9;
+		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 	}
 
 	.nav-right {
@@ -1110,110 +1700,17 @@
 		color: #e5e5e5;
 	}
 
-	.user-pill:hover {
-		background: #222222;
-		border-color: #444444;
-	}
-
-	.user-pill .chevron {
-		transition: transform 0.2s;
-		color: #a0a0a0;
-	}
-
-	.user-pill .chevron.open {
-		transform: rotate(180deg);
-	}
-
-	.user-avatar {
-		width: 24px;
-		height: 24px;
-		border-radius: 50%;
-	}
-
-	.user-dropdown {
-		position: absolute;
-		top: calc(100% + 0.5rem);
-		right: 0;
-		min-width: 160px;
-		background: #1a1a1a;
-		border: 1px solid #333333;
-		border-radius: 0.5rem;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-		overflow: hidden;
-		z-index: 1000;
-		animation: dropdownSlide 0.2s ease-out;
-	}
-
-	@keyframes dropdownSlide {
-		from {
-			opacity: 0;
-			transform: translateY(-8px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-
-	.dropdown-item {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		width: 100%;
-		padding: 0.75rem 1rem;
-		background: transparent;
-		border: none;
-		color: #e5e5e5;
-		font-size: 0.875rem;
-		cursor: pointer;
-		transition: all 0.2s;
-		text-align: left;
-	}
-
-	.dropdown-item:hover {
-		background: #222222;
-	}
-
-	.dropdown-item.logout:hover {
-		color: #ef4444;
-	}
-
-	.dropdown-item svg {
-		flex-shrink: 0;
-	}
-
-	.login-btn {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.5rem 1rem;
-		background: #1a1a1a;
-		border: 1px solid #10b981;
-		border-radius: 0.5rem;
-		color: #10b981;
-		font-size: 0.875rem;
-		font-weight: 500;
-		cursor: pointer;
-		transition: all 0.2s;
-	}
-
-	.login-btn:hover {
-		background: #10b981;
-		color: #000000;
-		transform: translateY(-1px);
-		box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-	}
-
-	.login-btn svg {
-		flex-shrink: 0;
-	}
-
 	/* Chat Area */
 	.chat-area {
 		flex: 1;
 		overflow: hidden;
 		display: flex;
 		flex-direction: column;
+		position: relative;
+	}
+
+	.chat-area.input-centered {
+		justify-content: center;
 	}
 
 	.messages-container {
@@ -1261,6 +1758,90 @@
 		color: #a0a0a0;
 		margin: 0;
 		max-width: 500px;
+	}
+
+	.welcome-description {
+		font-weight: 600;
+		color: #e5e5e5;
+		margin-top: 1rem !important;
+	}
+
+	.capabilities-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		margin-top: 1rem;
+		text-align: left;
+		max-width: 400px;
+		width: 100%;
+	}
+
+	.capability-item {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.75rem 1rem;
+		background: #1a1a1a;
+		border: 1px solid #333333;
+		border-radius: 0.5rem;
+		color: #e5e5e5;
+		transition: all 0.2s;
+	}
+
+	.capability-item:hover {
+		background: #222222;
+		border-color: #444444;
+	}
+
+	.capability-item svg {
+		flex-shrink: 0;
+		color: #667eea;
+	}
+
+	.welcome-tip {
+		margin-top: 1.5rem !important;
+		font-size: 0.875rem !important;
+		font-style: italic;
+	}
+
+	.welcome-input-wrapper {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		width: 100%;
+		max-width: 600px;
+		padding: 0.75rem 1rem;
+		background: #1a1a1a;
+		border: 1px solid #333333;
+		border-radius: 1.5rem;
+		transition: border-color 0.2s;
+		margin: 1rem 0;
+	}
+
+	.welcome-input-wrapper:focus-within {
+		border-color: #667eea;
+		box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+	}
+
+	.new-chat-mini-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		padding: 0;
+		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		border: none;
+		border-radius: 0.375rem;
+		color: white;
+		cursor: pointer;
+		transition: all 0.2s;
+		flex-shrink: 0;
+	}
+
+	.new-chat-mini-btn:hover {
+		opacity: 0.9;
+		transform: scale(1.05);
 	}
 
 	.messages-list {
@@ -1322,7 +1903,6 @@
 	}
 
 	.message-content {
-		white-space: pre-wrap;
 		word-wrap: break-word;
 	}
 
@@ -1342,11 +1922,43 @@
 		flex-shrink: 0;
 		padding: 1rem;
 		background: #0a0a0a;
-		border-top: 1px solid #222222;
 		/* Add safe area for mobile home indicator */
 		padding-bottom: max(1rem, env(safe-area-inset-bottom));
 		padding-left: max(1rem, env(safe-area-inset-left));
 		padding-right: max(1rem, env(safe-area-inset-right));
+		transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+	}
+
+	.input-area.centered {
+		position: absolute;
+		bottom: 50%;
+		left: 0;
+		right: 0;
+		transform: translateY(50%);
+		background: transparent;
+		z-index: 10;
+	}
+
+	.bottom-input-area {
+		flex-shrink: 0;
+		padding: 1rem;
+		background: #0a0a0a;
+		/* Add safe area for mobile home indicator */
+		padding-bottom: max(1rem, env(safe-area-inset-bottom));
+		padding-left: max(1rem, env(safe-area-inset-left));
+		padding-right: max(1rem, env(safe-area-inset-right));
+		animation: slideToBottom 0.3s ease-out;
+	}
+
+	@keyframes slideToBottom {
+		from {
+			transform: translateY(-50vh);
+			opacity: 0.5;
+		}
+		to {
+			transform: translateY(0);
+			opacity: 1;
+		}
 	}
 
 	.error-banner {
@@ -1751,24 +2363,11 @@
 
 	/* Mobile-First Responsive Design */
 	@media (max-width: 768px) {
-		/* Hide username on mobile, show only avatar */
-		.user-pill .user-name {
-			display: none;
-		}
-
-		.user-pill {
-			padding: 0.375rem;
-		}
-
 		/* Adjust navigation for mobile */
 		.top-nav {
 			padding: 0.5rem 0.75rem;
 			height: auto;
 			min-height: 50px;
-		}
-
-		.logo {
-			font-size: 1.125rem;
 		}
 
 		.repo-badge {
@@ -1795,15 +2394,6 @@
 		.status-pill {
 			padding: 0.375rem 0.625rem;
 			font-size: 0.8125rem;
-		}
-
-		.login-btn {
-			padding: 0.375rem 0.75rem;
-			font-size: 0.8125rem;
-		}
-
-		.login-btn span {
-			display: none;
 		}
 
 		/* Optimize messages for mobile */
@@ -1905,10 +2495,6 @@
 
 		.repo-badge span {
 			max-width: 80px;
-		}
-
-		.user-pill span {
-			display: none;
 		}
 
 		.status-pill span {
