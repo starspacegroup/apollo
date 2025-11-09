@@ -88,7 +88,8 @@ function createSessionStore() {
 
 		// Create a new session
 		createSession: (repository: string, title?: string, skipNavigation = false) => {
-			const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+			// Use crypto.randomUUID() for secure random ID generation
+			const sessionId = `session_${Date.now()}_${crypto.randomUUID().replace(/-/g, '').substring(0, 9)}`;
 			const now = Date.now();
 
 			const newSession: ChatSession = {
@@ -304,7 +305,8 @@ function createSessionStore() {
 			}
 
 			// Create new session for this repo
-			const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+			// Use crypto.randomUUID() for secure random ID generation
+			const sessionId = `session_${Date.now()}_${crypto.randomUUID().replace(/-/g, '').substring(0, 9)}`;
 			const now = Date.now();
 
 			const newSession: ChatSession = {
