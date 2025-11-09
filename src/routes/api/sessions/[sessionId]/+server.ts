@@ -75,7 +75,11 @@ export const PUT: RequestHandler = async ({ params, request, platform, locals })
 	try {
 		const userId = session.user.id;
 		const { sessionId } = params;
-		const body = await request.json();
+		const body = (await request.json()) as {
+			title?: string;
+			updatedAt?: number;
+			lastMessagePreview?: string;
+		};
 		const { title, updatedAt, lastMessagePreview } = body;
 
 		// Verify session belongs to user

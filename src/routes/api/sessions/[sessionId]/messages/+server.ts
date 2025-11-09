@@ -17,7 +17,13 @@ export const POST: RequestHandler = async ({ params, request, platform, locals }
 	try {
 		const userId = session.user.id;
 		const { sessionId } = params;
-		const body = await request.json();
+		const body = (await request.json()) as {
+			messages: Array<{
+				role: string;
+				text: string;
+				timestamp: number;
+			}>;
+		};
 		const { messages } = body;
 
 		if (!Array.isArray(messages) || messages.length === 0) {

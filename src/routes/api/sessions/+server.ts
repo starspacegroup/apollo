@@ -81,7 +81,13 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 
 	try {
 		const userId = session.user.id;
-		const body = await request.json();
+		const body = (await request.json()) as {
+			id: string;
+			repository: string;
+			title: string;
+			createdAt: number;
+			updatedAt: number;
+		};
 		const { id, repository, title, createdAt, updatedAt } = body;
 
 		if (!id || !repository || !title) {

@@ -347,7 +347,7 @@ function createSessionStore() {
 			try {
 				const response = await fetch('/api/sessions');
 				if (response.ok) {
-					const data = await response.json();
+					const data = (await response.json()) as { sessions: ChatSession[] };
 					const sessions = data.sessions || [];
 
 					// Update store with database sessions
@@ -389,7 +389,7 @@ function createSessionStore() {
 					});
 
 					// Sync messages if needed
-					const dbSession = await getResponse.json();
+					const dbSession = (await getResponse.json()) as ChatSession;
 					if (session.messages.length > dbSession.messages.length) {
 						const newMessages = session.messages.slice(dbSession.messages.length);
 						await fetch(`/api/sessions/${sessionId}/messages`, {
