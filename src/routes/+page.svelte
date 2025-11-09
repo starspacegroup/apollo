@@ -1,138 +1,142 @@
 ﻿<script lang="ts">
-import type { PageData } from './$types';
-import RepoSelector from '$lib/RepoSelector.svelte';
-import LiveChat from '$lib/LiveChat.svelte';
-import { repoStore } from '$lib/stores/repoStore';
-import { sessionStore, currentSession } from '$lib/stores/sessionStore';
-import { signIn } from '@auth/sveltekit/client';
-import { goto } from '$app/navigation';
-import { onMount } from 'svelte';
+	import type { PageData } from './$types';
+	import RepoSelector from '$lib/RepoSelector.svelte';
+	import LiveChat from '$lib/LiveChat.svelte';
+	import { repoStore } from '$lib/stores/repoStore';
+	import { sessionStore, currentSession } from '$lib/stores/sessionStore';
+	import { signIn } from '@auth/sveltekit/client';
+	import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
 
-let { data }: { data: PageData } = $props();
-const session = $derived(data.session);
-let repoSelector: any = $state();
+	let { data }: { data: PageData } = $props();
+	const session = $derived(data.session);
+	let repoSelector: any = $state();
 
-// Clear current session when on root page to ensure fresh chat
-onMount(() => {
-	sessionStore.clearCurrentSession();
-});
+	// Clear current session when on root page to ensure fresh chat
+	onMount(() => {
+		sessionStore.clearCurrentSession();
+	});
 
-function changeRepo() {
-	repoSelector?.openModal();
-}
+	function changeRepo() {
+		repoSelector?.openModal();
+	}
 </script>
 
 <svelte:head>
-<title>Apollo - AI-Powered GitHub Assistant</title>
+	<title>Apollo - AI-Powered GitHub Assistant</title>
 </svelte:head>
 
 {#if session}
-<RepoSelector {session} bind:this={repoSelector} />
+	<RepoSelector {session} bind:this={repoSelector} />
 
-<div class="app-container">
-<LiveChat repository={$repoStore || ''} {session} {changeRepo} />
-</div>
+	<div class="app-container">
+		<LiveChat repository={$repoStore || ''} {session} {changeRepo} />
+	</div>
 {:else}
-<div class="login-container">
-<div class="login-card">
-<h1>Apollo</h1>
-<p class="subtitle">AI-Powered GitHub Assistant</p>
-<p class="description">Sign in with GitHub to start chatting with your AI assistant about your repositories.</p>
-<button class="login-button" onclick={() => signIn('github')}>
-<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
-<path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
-</svg>
-Sign in with GitHub
-</button>
-</div>
-</div>
+	<div class="login-container">
+		<div class="login-card">
+			<h1>Apollo</h1>
+			<p class="subtitle">AI-Powered GitHub Assistant</p>
+			<p class="description">
+				Sign in with GitHub to start chatting with your AI assistant about your repositories.
+			</p>
+			<button class="login-button" onclick={() => signIn('github')}>
+				<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+					<path
+						d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+					/>
+				</svg>
+				Sign in with GitHub
+			</button>
+		</div>
+	</div>
 {/if}
 
 <style>
-:global(body) {
-margin: 0;
-padding: 0;
-overflow: hidden;
-}
+	:global(body) {
+		margin: 0;
+		padding: 0;
+		overflow: hidden;
+	}
 
-.app-container {
-width: 100vw;
-height: 100vh;
-height: 100dvh; /* Use dynamic viewport height for mobile */
-overflow: hidden;
-}
+	.app-container {
+		width: 100vw;
+		height: 100vh;
+		height: 100dvh; /* Use dynamic viewport height for mobile */
+		overflow: hidden;
+	}
 
-.login-container {
-width: 100vw;
-height: 100vh;
-display: flex;
-align-items: center;
-justify-content: center;
-background: #0a0a0a;
-}
+	.login-container {
+		width: 100vw;
+		height: 100vh;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: #0a0a0a;
+	}
 
-.login-card {
-background: #111111;
-border: 1px solid #222222;
-padding: 3rem;
-border-radius: 1rem;
-box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-text-align: center;
-max-width: 400px;
-width: 90%;
-}
+	.login-card {
+		background: #111111;
+		border: 1px solid #222222;
+		padding: 3rem;
+		border-radius: 1rem;
+		box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+		text-align: center;
+		max-width: 400px;
+		width: 90%;
+	}
 
-.login-card h1 {
-margin: 0 0 0.5rem 0;
-font-size: 2.5rem;
-color: #ffffff;
-font-weight: 700;
-}
+	.login-card h1 {
+		margin: 0 0 0.5rem 0;
+		font-size: 2.5rem;
+		color: #ffffff;
+		font-weight: 700;
+	}
 
-.subtitle {
-margin: 0 0 1.5rem 0;
-font-size: 1.1rem;
-background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
--webkit-background-clip: text;
--webkit-text-fill-color: transparent;
-background-clip: text;
-font-weight: 600;
-}
+	.subtitle {
+		margin: 0 0 1.5rem 0;
+		font-size: 1.1rem;
+		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		-webkit-background-clip: text;
+		-webkit-text-fill-color: transparent;
+		background-clip: text;
+		font-weight: 600;
+	}
 
-.description {
-margin: 0 0 2rem 0;
-color: #a0a0a0;
-line-height: 1.6;
-}
+	.description {
+		margin: 0 0 2rem 0;
+		color: #a0a0a0;
+		line-height: 1.6;
+	}
 
-.login-button {
-display: inline-flex;
-align-items: center;
-gap: 0.75rem;
-padding: 0.875rem 2rem;
-font-size: 1rem;
-font-weight: 600;
-color: #ffffff;
-background: #1a1a1a;
-border: 1px solid #10b981;
-border-radius: 0.5rem;
-cursor: pointer;
-transition: all 0.2s ease;
-}
+	.login-button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.875rem 2rem;
+		font-size: 1rem;
+		font-weight: 600;
+		color: #ffffff;
+		background: #1a1a1a;
+		border: 1px solid #10b981;
+		border-radius: 0.5rem;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
 
-.login-button:hover {
-background: #10b981;
-color: #000000;
-transform: translateY(-2px);
-box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-}
+	.login-button:hover {
+		background: #10b981;
+		color: #000000;
+		transform: translateY(-2px);
+		box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+	}
 
-.login-button:active {
-transform: translateY(0);
-}
+	.login-button:active {
+		transform: translateY(0);
+	}
 
-.login-button svg {
-width: 20px;
-height: 20px;
-}
+	.login-button svg {
+		width: 20px;
+		height: 20px;
+	}
 </style>

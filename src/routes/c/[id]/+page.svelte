@@ -9,7 +9,7 @@
 	let { data }: { data: PageData } = $props();
 	const session = $derived(data.session);
 	const sessionId = $derived(data.sessionId);
-	
+
 	let repoSelector: any = $state();
 	let currentRepository = $state('');
 
@@ -18,7 +18,7 @@
 		if (sessionId) {
 			// Try to switch to this session
 			sessionStore.switchSession(sessionId);
-			
+
 			// Check if session exists and load repository
 			const currentSession = sessionStore.getCurrentSession();
 			if (!currentSession) {
@@ -47,7 +47,12 @@
 	<RepoSelector {session} bind:this={repoSelector} />
 
 	<div class="app-container">
-		<LiveChat repository={currentRepository || $repoStore || ''} {session} {changeRepo} {sessionId} />
+		<LiveChat
+			repository={currentRepository || $repoStore || ''}
+			{session}
+			{changeRepo}
+			{sessionId}
+		/>
 	</div>
 {:else}
 	<div class="login-container">
@@ -55,9 +60,7 @@
 			<h1>Apollo</h1>
 			<p class="subtitle">AI-Powered GitHub Assistant</p>
 			<p class="description">Please sign in to continue.</p>
-			<button class="login-button" onclick={() => goto('/')}>
-				Go to Home
-			</button>
+			<button class="login-button" onclick={() => goto('/')}> Go to Home </button>
 		</div>
 	</div>
 {/if}

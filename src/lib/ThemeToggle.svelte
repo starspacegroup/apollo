@@ -13,12 +13,7 @@
 	}
 </script>
 
-<button
-	class="theme-toggle"
-	onclick={toggleTheme}
-	aria-label="Dark mode"
-	title="Dark mode"
->
+<button class="theme-toggle" onclick={toggleTheme} aria-label="Dark mode" title="Dark mode">
 	{#if theme === 'dark'}
 		<svg
 			xmlns="http://www.w3.org/2000/svg"

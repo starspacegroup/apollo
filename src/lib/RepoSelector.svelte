@@ -183,7 +183,7 @@
 		repoInput = '';
 		error = '';
 		searchQuery = '';
-		
+
 		// If switching to a different repo and not on home page, navigate to home
 		if (browser && currentRepo !== fullName && window.location.pathname !== '/') {
 			goto('/');
@@ -206,7 +206,7 @@
 			isOpen = false;
 			repoInput = '';
 			error = '';
-			
+
 			// If switching to a different repo and not on home page, navigate to home
 			if (browser && currentRepo !== trimmedRepo && window.location.pathname !== '/') {
 				goto('/');
