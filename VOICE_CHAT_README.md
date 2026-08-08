@@ -35,7 +35,7 @@ and Cloudflare Workers.
 1. Go to GitHub Settings > Developer Settings > OAuth Apps
 2. Create a new OAuth App
 3. Set Authorization callback URL to:
-   `http://localhost:5173/auth/callback/github` (for production, use your
+   `http://localhost:8787/auth/callback/github` (for production, use your
    deployed URL)
 4. Copy the Client ID and generate a Client Secret
 5. See `GITHUB_AUTH_SETUP.md` for detailed instructions
@@ -81,7 +81,7 @@ npm run dev
 ```
 
 Voice chat now works with regular development mode! The custom Vite plugin
-handles WebSocket connections. Navigate to `http://localhost:5173`
+handles WebSocket connections. Navigate to `http://localhost:8787/`
 
 **📦 Build and Preview with Wrangler:**
 
@@ -89,7 +89,7 @@ handles WebSocket connections. Navigate to `http://localhost:5173`
 npm run preview
 ```
 
-This will build your app and run it with Wrangler on `http://localhost:8788`
+This will build your app and run it with Wrangler on `http://localhost:8787/`
 
 **🚀 Deploy to Cloudflare:**
 
@@ -100,7 +100,7 @@ npm run deploy
 ### 5. Sign In and Select Repository
 
 1. Once running, navigate to the application
-   - Local: `http://localhost:5173`
+   - Local: `http://localhost:8787/`
    - Production: `https://your-domain.pages.dev`
 2. Click "Sign in with GitHub" in the top-right corner
 3. Authorize the application to access your GitHub account
@@ -205,9 +205,9 @@ npm run deploy
 
 Server-side Voice Activity Detection (VAD) is enabled with:
 
-- Threshold: 0.5
+- Threshold: 0.6
 - Prefix padding: 300ms
-- Silence duration: 500ms
+- Silence duration: 800ms
 
 ## Quick Start Guide
 

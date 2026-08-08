@@ -75,7 +75,7 @@ conversation.
   - Updated feature list to include text chat
   - Added usage section with text/voice switching instructions
   - Updated title and descriptions
-- `src/routes/chat/+page.svelte`:
+- `src/routes/+page.svelte`:
   - Updated page title and meta description
 
 ## User Workflow
