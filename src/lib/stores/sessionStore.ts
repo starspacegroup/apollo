@@ -8,6 +8,9 @@ export interface ChatMessage {
 	timestamp: number;
 }
 
+// Track if we're currently syncing to prevent loops
+let isSyncing = false;
+
 export interface ChatSession {
 	id: string;
 	repository: string;
@@ -85,7 +88,8 @@ function createSessionStore() {
 
 		// Create a new session
 		createSession: (repository: string, title?: string, skipNavigation = false) => {
-			const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+			// Use crypto.randomUUID() for secure random ID generation
+			const sessionId = `session_${Date.now()}_${crypto.randomUUID().replace(/-/g, '').substring(0, 9)}`;
 			const now = Date.now();
 
 			const newSession: ChatSession = {
@@ -257,6 +261,13 @@ function createSessionStore() {
 					sessions
 				};
 			});
+
+			// Also delete from database (async, don't wait)
+			if (browser) {
+				fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' }).catch((err) =>
+					console.error('Failed to delete session from database:', err)
+				);
+			}
 		},
 
 		// Clear current session (deselect)
@@ -294,7 +305,8 @@ function createSessionStore() {
 			}
 
 			// Create new session for this repo
-			const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+			// Use crypto.randomUUID() for secure random ID generation
+			const sessionId = `session_${Date.now()}_${crypto.randomUUID().replace(/-/g, '').substring(0, 9)}`;
 			const now = Date.now();
 
 			const newSession: ChatSession = {
@@ -327,6 +339,106 @@ function createSessionStore() {
 		getSessionsForRepo: (repository: string) => {
 			const state = get({ subscribe });
 			return state.sessions.filter((s) => s.repository === repository);
+		},
+
+		// Sync sessions from database
+		syncFromDatabase: async () => {
+			if (!browser || isSyncing) return;
+
+			isSyncing = true;
+			try {
+				const response = await fetch('/api/sessions');
+				if (response.ok) {
+					const data = (await response.json()) as { sessions: ChatSession[] };
+					const sessions = data.sessions || [];
+
+					// Update store with database sessions
+					update((state) => ({
+						...state,
+						sessions: sessions
+					}));
+				}
+			} catch (error) {
+				console.error('Failed to sync sessions from database:', error);
+			} finally {
+				isSyncing = false;
+			}
+		},
+
+		// Sync a session to database
+		syncSessionToDatabase: async (sessionId: string) => {
+			if (!browser || isSyncing) return;
+
+			const state = get({ subscribe });
+			const session = state.sessions.find((s) => s.id === sessionId);
+
+			if (!session) return;
+
+			try {
+				// Check if session exists in database
+				const getResponse = await fetch(`/api/sessions/${sessionId}`);
+
+				if (getResponse.ok) {
+					// Update existing session
+					await fetch(`/api/sessions/${sessionId}`, {
+						method: 'PUT',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							title: session.title,
+							updatedAt: session.updatedAt,
+							lastMessagePreview: session.lastMessagePreview
+						})
+					});
+
+					// Sync messages if needed
+					const dbSession = (await getResponse.json()) as ChatSession;
+					if (session.messages.length > dbSession.messages.length) {
+						const newMessages = session.messages.slice(dbSession.messages.length);
+						await fetch(`/api/sessions/${sessionId}/messages`, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ messages: newMessages })
+						});
+					}
+				} else if (getResponse.status === 404) {
+					// Create new session
+					await fetch('/api/sessions', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							id: session.id,
+							repository: session.repository,
+							title: session.title,
+							createdAt: session.createdAt,
+							updatedAt: session.updatedAt
+						})
+					});
+
+					// Add messages if any
+					if (session.messages.length > 0) {
+						await fetch(`/api/sessions/${sessionId}/messages`, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ messages: session.messages })
+						});
+					}
+				}
+			} catch (error) {
+				console.error('Failed to sync session to database:', error);
+			}
+		},
+
+		// Delete a session from database
+		deleteSessionFromDatabase: async (sessionId: string) => {
+			if (!browser) return;
+
+			try {
+				await fetch(`/api/sessions/${sessionId}`, {
+					method: 'DELETE'
+				});
+			} catch (error) {
+				console.error('Failed to delete session from database:', error);
+			}
 		}
 	};
 }

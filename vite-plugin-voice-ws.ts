@@ -114,7 +114,6 @@ function setupOpenAIConnection(clientWs: WebSocket, OPENAI_API_KEY: string, repo
 	openaiWs.on('close', (code, reason) => {
 		console.log('OpenAI connection closed:', code, reason.toString());
 		if (clientWs.readyState === WebSocket.OPEN) {
-			// Use 1000 (normal closure) if code is invalid or reserved (1005, 1006, 1015)
 			const closeCode = relayCloseCode(code);
 			clientWs.close(closeCode, reason.toString());
 		}
@@ -124,7 +123,6 @@ function setupOpenAIConnection(clientWs: WebSocket, OPENAI_API_KEY: string, repo
 	clientWs.on('close', (code, reason) => {
 		console.log('Client connection closed:', code, reason.toString());
 		if (openaiWs.readyState === WebSocket.OPEN) {
-			// Use 1000 (normal closure) if code is invalid or reserved (1005, 1006, 1015)
 			const closeCode = relayCloseCode(code);
 			openaiWs.close(closeCode, reason.toString());
 		}
