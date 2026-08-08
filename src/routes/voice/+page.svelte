@@ -10,10 +10,7 @@
 
 <svelte:head>
 	<title>AI Chat - Apollo</title>
-	<meta
-		name="description"
-		content="AI Agile Product Owner Assistant for GitHub Repositories"
-	/>
+	<meta name="description" content="AI Agile Product Owner Assistant for GitHub Repositories" />
 </svelte:head>
 
 <div class="container">

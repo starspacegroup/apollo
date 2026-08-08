@@ -405,7 +405,7 @@ async function setupOpenAIConnection(
 
 		console.log('Sending session config with', tools.length, 'tools for repository:', repository);
 		console.log('Tool choice:', sessionConfig.session.tool_choice);
-		console.log('Tools:', tools.map(t => t.name).join(', '));
+		console.log('Tools:', tools.map((t) => t.name).join(', '));
 		console.log('Instructions length:', instructions.length);
 		openaiWs.send(JSON.stringify(sessionConfig));
 	});

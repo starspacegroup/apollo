@@ -36,18 +36,15 @@ conversation.
 Made the repository context much more explicit:
 
 ```typescript
-repoContext =
-  `You are currently working with the GitHub repository: **${repository}**\n`;
+repoContext = `You are currently working with the GitHub repository: **${repository}**\n`;
 repoContext += `Repository Owner: ${owner}\n`;
 repoContext += `Repository Name: ${repo}\n\n`;
-repoContext +=
-  `IMPORTANT: You have DIRECT ACCESS to GitHub API tools for the ${repository} repository.\n`;
+repoContext += `IMPORTANT: You have DIRECT ACCESS to GitHub API tools for the ${repository} repository.\n`;
 repoContext += `Available actions:\n`;
 repoContext += `- Get repository summary (use get_repository_summary tool)\n`;
 repoContext += `- List issues (use list_issues tool)\n`;
 // ... etc
-repoContext +=
-  `When users ask you to perform these actions, you MUST USE THE TOOLS. Do NOT return JSON objects or describe what you would do - EXECUTE THE TOOL CALLS.\n\n`;
+repoContext += `When users ask you to perform these actions, you MUST USE THE TOOLS. Do NOT return JSON objects or describe what you would do - EXECUTE THE TOOL CALLS.\n\n`;
 ```
 
 ### 3. Removed Auto-Introduction Message
@@ -61,14 +58,11 @@ Added more detailed logging for debugging:
 
 ```typescript
 // Log more details for responses
-if (message.type.includes("response")) {
-  console.log(
-    "Response details:",
-    JSON.stringify(message, null, 2).substring(0, 500),
-  );
+if (message.type.includes('response')) {
+	console.log('Response details:', JSON.stringify(message, null, 2).substring(0, 500));
 }
 
-console.log("Tool call executing:", functionName, "with args:", args);
+console.log('Tool call executing:', functionName, 'with args:', args);
 ```
 
 ## Testing Instructions
@@ -129,7 +123,7 @@ Add this to the browser console to see WebSocket messages:
 
 ```javascript
 // In browser console
-window.addEventListener("message", (e) => console.log("WS:", e.data));
+window.addEventListener('message', (e) => console.log('WS:', e.data));
 ```
 
 ## Model Configuration Notes

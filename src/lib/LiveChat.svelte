@@ -4,7 +4,12 @@
 	import MarkdownRenderer from './MarkdownRenderer.svelte';
 	import SessionsPanel from './SessionsPanel.svelte';
 	import { signIn, signOut } from '@auth/sveltekit/client';
-	import { sessionStore, currentSession, type ChatSession, type ChatMessage } from './stores/sessionStore';
+	import {
+		sessionStore,
+		currentSession,
+		type ChatSession,
+		type ChatMessage
+	} from './stores/sessionStore';
 	import { repoStore } from './stores/repoStore';
 	import { goto } from '$app/navigation';
 
@@ -69,49 +74,50 @@
 	// Reconnect when repository changes
 	$effect(() => {
 		console.log('Repository effect triggered:', { repository, connectedRepository, sessionId });
-		
+
 		// Clear any previous errors when switching sessions
 		error = '';
-		
+
 		// If sessionId is provided, switch to that session
 		if (sessionId) {
 			const currentSession = sessionStore.getCurrentSession();
 			if (!currentSession || currentSession.id !== sessionId) {
 				sessionStore.switchSession(sessionId);
 			}
-			
+
 			// Load transcript from session when sessionId is provided
 			const sessionData = sessionStore.getCurrentSession();
 			if (sessionData) {
 				// Convert ChatMessage[] to transcript format
-				transcript = sessionData.messages.map(msg => ({
+				transcript = sessionData.messages.map((msg) => ({
 					role: msg.role,
 					text: msg.text
 				}));
 			}
 		}
-		
+
 		// Only reconnect if repository actually changed
 		if (repository !== connectedRepository) {
 			if (repository) {
 				// Check if we already have a working connection to this repo
-				const hasWorkingConnection = ws && ws.readyState === WebSocket.OPEN && connectedRepository === repository;
-				
+				const hasWorkingConnection =
+					ws && ws.readyState === WebSocket.OPEN && connectedRepository === repository;
+
 				if (hasWorkingConnection) {
 					console.log('WebSocket already connected to this repository, skipping reconnect');
 				} else {
 					// Repository was selected or changed
 					console.log('Repository changed, connecting to:', repository);
-					
+
 					// Clear transcript when switching repos (unless we have a sessionId)
 					if (!sessionId) {
 						transcript = [];
 					}
-					
+
 					// Connect to the new repository
 					connectWebSocket();
 				}
-				
+
 				// Focus the text input when repository is selected
 				setTimeout(() => {
 					textInputRef?.focus();
@@ -138,15 +144,16 @@
 			// This effect runs when transcript changes
 			// We need to be careful not to create infinite loops
 			const sessionMessages = $currentSession.messages;
-			
+
 			// Only sync if transcript is different from session
 			// (to avoid circular updates)
-			const transcriptChanged = 
+			const transcriptChanged =
 				transcript.length !== sessionMessages.length ||
-				transcript.some((msg, idx) => 
-					!sessionMessages[idx] || 
-					msg.text !== sessionMessages[idx].text ||
-					msg.role !== sessionMessages[idx].role
+				transcript.some(
+					(msg, idx) =>
+						!sessionMessages[idx] ||
+						msg.text !== sessionMessages[idx].text ||
+						msg.role !== sessionMessages[idx].role
 				);
 
 			// This is handled by addTranscript and updateTranscript functions
@@ -376,7 +383,7 @@
 							if (lastUserIndex !== -1) {
 								transcript[lastUserIndex].text = data.transcript;
 								transcript = [...transcript];
-								
+
 								// Sync to session store - replace the placeholder
 								sessionStore.replaceLastMessage(data.transcript);
 							} else {
@@ -390,10 +397,15 @@
 						console.log('Response done:', data.response?.id);
 						processingResponse = false;
 						currentResponseId = null;
-						
+
 						// Navigate to session URL after response is complete (if on root path)
 						// But don't navigate if in voice mode to avoid disconnecting
-						if (typeof window !== 'undefined' && window.location.pathname === '/' && $currentSession && !isVoiceMode) {
+						if (
+							typeof window !== 'undefined' &&
+							window.location.pathname === '/' &&
+							$currentSession &&
+							!isVoiceMode
+						) {
 							console.log('Response complete, navigating to session URL');
 							goto(`/c/${$currentSession.id}`, { replaceState: true });
 						}
@@ -428,7 +440,7 @@
 				const wasConnectedToRepo = connectedRepository;
 				connectedRepository = ''; // Clear connected repository on close
 				console.log('Disconnected from AI chat');
-				
+
 				// If connection was rejected due to authentication (401)
 				if (event.code === 1008 || event.reason?.includes('Authentication')) {
 					error = 'Authentication required. Please sign in.';
@@ -508,7 +520,7 @@
 				console.log('Cleaning up existing voice session before starting new one');
 				stopRecording();
 				// Wait a bit for cleanup
-				await new Promise(resolve => setTimeout(resolve, 100));
+				await new Promise((resolve) => setTimeout(resolve, 100));
 			}
 
 			// Cancel any ongoing audio and reset state
@@ -523,7 +535,7 @@
 
 			// Create a new session for voice chat (similar to text chat)
 			let currentSessionId = $currentSession?.id;
-			
+
 			if (!currentSessionId) {
 				console.log('Creating new session for voice chat');
 				currentSessionId = sessionStore.createSession(repository, undefined, true);
@@ -551,9 +563,11 @@
 			if (ws && ws.readyState === WebSocket.OPEN) {
 				// Clear any previous conversation state before enabling voice mode
 				console.log('Clearing conversation state before starting voice session');
-				ws.send(JSON.stringify({ 
-					type: 'input_audio_buffer.clear'
-				}));
+				ws.send(
+					JSON.stringify({
+						type: 'input_audio_buffer.clear'
+					})
+				);
 
 				isVoiceMode = true;
 				enableServerVAD();
@@ -568,10 +582,10 @@
 			console.error('Error starting voice chat:', err);
 			error = err instanceof Error ? err.message : 'Failed to start voice chat';
 			isConnecting = false;
-			
+
 			// Clean up if we failed
 			if (mediaStream) {
-				mediaStream.getTracks().forEach(track => track.stop());
+				mediaStream.getTracks().forEach((track) => track.stop());
 				mediaStream = null;
 			}
 			if (audioContext) {
@@ -641,7 +655,7 @@
 
 	function stopRecording() {
 		console.log('Stopping recording and cleaning up audio resources');
-		
+
 		// Disconnect and clean up audio processor
 		if (audioProcessor) {
 			try {
@@ -664,13 +678,16 @@
 
 		// Close audio context and set to null for clean restart
 		if (audioContext && audioContext.state !== 'closed') {
-			audioContext.close().then(() => {
-				console.log('Audio context closed');
-				audioContext = null;
-			}).catch((e) => {
-				console.warn('Error closing audio context:', e);
-				audioContext = null;
-			});
+			audioContext
+				.close()
+				.then(() => {
+					console.log('Audio context closed');
+					audioContext = null;
+				})
+				.catch((e) => {
+					console.warn('Error closing audio context:', e);
+					audioContext = null;
+				});
 		} else {
 			audioContext = null;
 		}
@@ -830,14 +847,14 @@
 
 	function addTranscript(role: string, text: string) {
 		transcript = [...transcript, { role, text }];
-		
+
 		// Only add to session store if we have an active session
 		// (session should already be created before calling this function)
 		if (!$currentSession) {
 			console.warn('No active session when adding transcript - message will not be saved');
 			return;
 		}
-		
+
 		// Sync to session store
 		const message: ChatMessage = {
 			role: role as 'user' | 'assistant' | 'system',
@@ -851,7 +868,7 @@
 		if (transcript.length > 0 && transcript[transcript.length - 1].role === role) {
 			transcript[transcript.length - 1].text += text;
 			transcript = [...transcript];
-			
+
 			// Sync to session store - update last message
 			sessionStore.updateLastMessage(text);
 		} else {
@@ -867,7 +884,7 @@
 
 		// Ensure we have an active session - create one if needed
 		let currentSessionId = $currentSession?.id;
-		
+
 		if (!currentSessionId && repository) {
 			console.log('No active session when sending message, creating new session');
 			// Always skip navigation - we'll navigate after response.created
@@ -937,7 +954,7 @@
 		// Request response from AI (explicit for text messages)
 		console.log('Requesting AI response for text message');
 		ws.send(JSON.stringify({ type: 'response.create' }));
-		
+
 		// Navigation will happen automatically in response.created handler
 		// This prevents interrupting the response stream
 	}
@@ -951,13 +968,13 @@
 
 	function stopVoiceChat() {
 		console.log('Stopping voice chat');
-		
+
 		// Clear any errors from the voice session
 		error = '';
-		
+
 		// Cancel any ongoing audio playback
 		cancelCurrentAudio();
-		
+
 		// Stop recording and clean up media resources
 		stopRecording();
 
@@ -986,9 +1003,11 @@
 			try {
 				console.log('Clearing input audio buffer');
 				// Only clear the input audio buffer, don't truncate conversation
-				ws.send(JSON.stringify({ 
-					type: 'input_audio_buffer.clear'
-				}));
+				ws.send(
+					JSON.stringify({
+						type: 'input_audio_buffer.clear'
+					})
+				);
 			} catch (e) {
 				console.warn('Failed to clear audio buffer:', e);
 			}
@@ -1008,10 +1027,10 @@
 
 	function disconnect() {
 		console.log('Disconnecting and cleaning up all resources');
-		
+
 		// Cancel any ongoing audio and responses
 		cancelCurrentAudio();
-		
+
 		// Stop recording and clean up media resources
 		stopRecording();
 
@@ -1049,19 +1068,19 @@
 
 		// Create a new session for current repository
 		const newSessionId = sessionStore.createSession(repository);
-		
+
 		// Clear transcript to start fresh
 		transcript = [];
-		
+
 		// Clear any existing conversation state
 		if (ws && ws.readyState === WebSocket.OPEN) {
 			// Could send a clear conversation command if needed
 			console.log('Started new session:', newSessionId, 'for repository:', repository);
 		}
-		
+
 		// Session will appear in history once the first message is added
 		console.log('New session created, will appear in history after first message');
-		
+
 		// Focus the text input after creating a new session
 		setTimeout(() => {
 			textInputRef?.focus();
@@ -1093,7 +1112,7 @@
 			{session}
 		/>
 	{/if}
-	
+
 	<!-- Main Content Area -->
 	<div class="main-content">
 		<!-- Top Navigation Bar -->
@@ -1102,19 +1121,43 @@
 				<!-- Hamburger menu for mobile -->
 				{#if session?.user}
 					<button class="hamburger-btn" onclick={toggleSidebar} aria-label="Toggle sidebar">
-						<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="24"
+							height="24"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
 							<line x1="3" y1="12" x2="21" y2="12"></line>
 							<line x1="3" y1="6" x2="21" y2="6"></line>
 							<line x1="3" y1="18" x2="21" y2="18"></line>
 						</svg>
 					</button>
 				{/if}
-				
+
 				{#if session?.user}
 					{#if repository}
-						<button onclick={changeRepo} class="repo-badge connected" title="Connected to {repository}\nClick to change repository">
-							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+						<button
+							onclick={changeRepo}
+							class="repo-badge connected"
+							title="Connected to {repository}\nClick to change repository"
+						>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								width="16"
+								height="16"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+							>
+								<path
+									d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+								></path>
 							</svg>
 							<span class="repo-full-name">{repository}</span>
 							{#if isConnected}
@@ -1122,9 +1165,23 @@
 							{/if}
 						</button>
 					{:else}
-						<button onclick={changeRepo} class="repo-badge select-repo" title="Select a repository to start">
-							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+						<button
+							onclick={changeRepo}
+							class="repo-badge select-repo"
+							title="Select a repository to start"
+						>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								width="16"
+								height="16"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+							>
+								<path
+									d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+								></path>
 							</svg>
 							<span>Select Repository</span>
 						</button>
@@ -1166,50 +1223,259 @@
 						<span>Speaking</span>
 					</div>
 				{/if}
-		</div>
-	</nav>
+			</div>
+		</nav>
 
-	<!-- Main Chat Area -->
-	<div class="chat-area" class:input-centered={inputCentered}>
-		<div class="messages-container" bind:this={messagesContainerRef}>
-			{#if !repository}
-				<div class="welcome-state">
-					<div class="welcome-icon">
+		<!-- Main Chat Area -->
+		<div class="chat-area" class:input-centered={inputCentered}>
+			<div class="messages-container" bind:this={messagesContainerRef}>
+				{#if !repository}
+					<div class="welcome-state">
+						<div class="welcome-icon">
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								width="64"
+								height="64"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.5"
+							>
+								<path
+									d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+								></path>
+							</svg>
+						</div>
+						<h2>Select a Repository</h2>
+						<p>Choose a GitHub repository from the selector above to start chatting with Apollo</p>
+					</div>
+				{:else if transcript.length === 0}
+					<div class="welcome-state">
+						<div class="welcome-icon">
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								width="64"
+								height="64"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.5"
+							>
+								<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+							</svg>
+						</div>
+						<h2>Connected to {repository}</h2>
+
+						<!-- Input field directly below "Connected to" -->
+						{#if transcript.length === 0}
+							<div class="welcome-input-wrapper">
+								<textarea
+									bind:this={textInputRef}
+									bind:value={textMessage}
+									onkeydown={handleKeyDown}
+									placeholder="Message Apollo..."
+									rows="1"
+									class="message-input"
+								></textarea>
+
+								<button
+									class="send-btn"
+									onclick={sendTextMessage}
+									disabled={!textMessage.trim()}
+									title="Send message"
+								>
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										width="20"
+										height="20"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									>
+										<line x1="22" y1="2" x2="11" y2="13"></line>
+										<polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+									</svg>
+								</button>
+
+								<button
+									class="voice-btn"
+									class:connecting={isConnecting}
+									class:recording={isVoiceMode && isRecording}
+									class:speaking={isSpeaking}
+									class:active={isVoiceMode}
+									onclick={isVoiceMode ? stopVoiceChat : startVoiceChat}
+									title={isVoiceMode ? 'Stop voice chat' : 'Start voice chat'}
+								>
+									<div class="waveform-icon">
+										{#if isVoiceMode}
+											<!-- Stop icon when active -->
+											<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+												<rect width="8" height="8" x="6" y="6" rx="1.5"></rect>
+											</svg>
+										{:else}
+											<!-- Custom 5-bar waveform icon -->
+											<svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+												<rect
+													class="bar bar-1"
+													x="3"
+													y="8"
+													width="2.5"
+													height="8"
+													rx="1.25"
+													fill="currentColor"
+												></rect>
+												<rect
+													class="bar bar-2"
+													x="7.5"
+													y="5"
+													width="2.5"
+													height="14"
+													rx="1.25"
+													fill="currentColor"
+												></rect>
+												<rect
+													class="bar bar-3"
+													x="12"
+													y="3"
+													width="2.5"
+													height="18"
+													rx="1.25"
+													fill="currentColor"
+												></rect>
+												<rect
+													class="bar bar-4"
+													x="16.5"
+													y="5"
+													width="2.5"
+													height="14"
+													rx="1.25"
+													fill="currentColor"
+												></rect>
+												<rect
+													class="bar bar-5"
+													x="21"
+													y="8"
+													width="2.5"
+													height="8"
+													rx="1.25"
+													fill="currentColor"
+												></rect>
+											</svg>
+										{/if}
+									</div>
+								</button>
+							</div>
+						{/if}
+
+						<p class="welcome-description">I can help you with:</p>
+						<div class="capabilities-list">
+							<div class="capability-item">
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									width="20"
+									height="20"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<circle cx="12" cy="12" r="10"></circle>
+									<path d="M12 16v-4"></path>
+									<path d="M12 8h.01"></path>
+								</svg>
+								<span>Creating and managing GitHub issues</span>
+							</div>
+							<div class="capability-item">
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									width="20"
+									height="20"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<circle cx="11" cy="11" r="8"></circle>
+									<path d="m21 21-4.35-4.35"></path>
+								</svg>
+								<span>Searching through your codebase</span>
+							</div>
+							<div class="capability-item">
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									width="20"
+									height="20"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<path
+										d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+									></path>
+								</svg>
+								<span>Getting repository information and stats</span>
+							</div>
+							<div class="capability-item">
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									width="20"
+									height="20"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+								</svg>
+								<span>Adding comments to issues</span>
+							</div>
+						</div>
+						<p class="welcome-tip">Type a message or start a voice conversation to get started!</p>
+					</div>
+				{:else}
+					<div class="messages-list">
+						{#each transcript as message, index}
+							<div class="message-wrapper {message.role}">
+								<div class="message-bubble">
+									<div class="message-content">
+										<MarkdownRenderer content={message.text} />
+									</div>
+								</div>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Bottom Input Area - Shows when there are messages -->
+		{#if transcript.length > 0 && repository}
+			<div class="bottom-input-area">
+				{#if error}
+					<div class="error-banner">
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
-							width="64"
-							height="64"
+							width="16"
+							height="16"
 							viewBox="0 0 24 24"
 							fill="none"
 							stroke="currentColor"
-							stroke-width="1.5"
+							stroke-width="2"
 						>
-							<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+							<circle cx="12" cy="12" r="10"></circle>
+							<line x1="12" y1="8" x2="12" y2="12"></line>
+							<line x1="12" y1="16" x2="12.01" y2="16"></line>
 						</svg>
+						{error}
 					</div>
-					<h2>Select a Repository</h2>
-					<p>Choose a GitHub repository from the selector above to start chatting with Apollo</p>
-				</div>
-			{:else if transcript.length === 0}
-				<div class="welcome-state">
-					<div class="welcome-icon">
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							width="64"
-							height="64"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="1.5"
-						>
-							<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-						</svg>
-					</div>
-					<h2>Connected to {repository}</h2>
-					
-					<!-- Input field directly below "Connected to" -->
-					{#if transcript.length === 0}
-					<div class="welcome-input-wrapper">
+				{/if}
+
+				<div class="input-wrapper">
+					<div class="input-controls">
 						<textarea
 							bind:this={textInputRef}
 							bind:value={textMessage}
@@ -1307,187 +1573,14 @@
 									</svg>
 								{/if}
 							</div>
+							{#if isVoiceMode && isRecording}
+								<div class="pulse-ring"></div>
+							{/if}
 						</button>
 					</div>
-					{/if}
-					
-					<p class="welcome-description">I can help you with:</p>
-					<div class="capabilities-list">
-						<div class="capability-item">
-							<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<circle cx="12" cy="12" r="10"></circle>
-								<path d="M12 16v-4"></path>
-								<path d="M12 8h.01"></path>
-							</svg>
-							<span>Creating and managing GitHub issues</span>
-						</div>
-						<div class="capability-item">
-							<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<circle cx="11" cy="11" r="8"></circle>
-								<path d="m21 21-4.35-4.35"></path>
-							</svg>
-							<span>Searching through your codebase</span>
-						</div>
-						<div class="capability-item">
-							<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-							</svg>
-							<span>Getting repository information and stats</span>
-						</div>
-						<div class="capability-item">
-							<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-							</svg>
-							<span>Adding comments to issues</span>
-						</div>
-					</div>
-					<p class="welcome-tip">Type a message or start a voice conversation to get started!</p>
-				</div>
-			{:else}
-				<div class="messages-list">
-					{#each transcript as message, index}
-						<div class="message-wrapper {message.role}">
-							<div class="message-bubble">
-								<div class="message-content">
-									<MarkdownRenderer content={message.text} />
-								</div>
-							</div>
-						</div>
-					{/each}
-				</div>
-			{/if}
-		</div>
-	</div>
-
-	<!-- Bottom Input Area - Shows when there are messages -->
-	{#if transcript.length > 0 && repository}
-		<div class="bottom-input-area">
-			{#if error}
-				<div class="error-banner">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="16"
-						height="16"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<circle cx="12" cy="12" r="10"></circle>
-						<line x1="12" y1="8" x2="12" y2="12"></line>
-						<line x1="12" y1="16" x2="12.01" y2="16"></line>
-					</svg>
-					{error}
-				</div>
-			{/if}
-
-			<div class="input-wrapper">
-				<div class="input-controls">
-					<textarea
-						bind:this={textInputRef}
-						bind:value={textMessage}
-						onkeydown={handleKeyDown}
-						placeholder="Message Apollo..."
-						rows="1"
-						class="message-input"
-					></textarea>
-
-					<button
-						class="send-btn"
-						onclick={sendTextMessage}
-						disabled={!textMessage.trim()}
-						title="Send message"
-					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							width="20"
-							height="20"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-						>
-							<line x1="22" y1="2" x2="11" y2="13"></line>
-							<polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-						</svg>
-					</button>
-
-					<button
-						class="voice-btn"
-						class:connecting={isConnecting}
-						class:recording={isVoiceMode && isRecording}
-						class:speaking={isSpeaking}
-						class:active={isVoiceMode}
-						onclick={isVoiceMode ? stopVoiceChat : startVoiceChat}
-						title={isVoiceMode ? 'Stop voice chat' : 'Start voice chat'}
-					>
-						<div class="waveform-icon">
-							{#if isVoiceMode}
-								<!-- Stop icon when active -->
-								<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-									<rect width="8" height="8" x="6" y="6" rx="1.5"></rect>
-								</svg>
-							{:else}
-								<!-- Custom 5-bar waveform icon -->
-								<svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-									<rect
-										class="bar bar-1"
-										x="3"
-										y="8"
-										width="2.5"
-										height="8"
-										rx="1.25"
-										fill="currentColor"
-									></rect>
-									<rect
-										class="bar bar-2"
-										x="7.5"
-										y="5"
-										width="2.5"
-										height="14"
-										rx="1.25"
-										fill="currentColor"
-									></rect>
-									<rect
-										class="bar bar-3"
-										x="12"
-										y="3"
-										width="2.5"
-										height="18"
-										rx="1.25"
-										fill="currentColor"
-									></rect>
-									<rect
-										class="bar bar-4"
-										x="16.5"
-										y="5"
-										width="2.5"
-										height="14"
-										rx="1.25"
-										fill="currentColor"
-									></rect>
-									<rect
-										class="bar bar-5"
-										x="21"
-										y="8"
-										width="2.5"
-										height="8"
-										rx="1.25"
-										fill="currentColor"
-									></rect>
-								</svg>
-							{/if}
-						</div>
-						{#if isVoiceMode && isRecording}
-							<div class="pulse-ring"></div>
-						{/if}
-					</button>
 				</div>
 			</div>
-		</div>
-	{/if}
+		{/if}
 	</div>
 </div>
 
@@ -1504,7 +1597,7 @@
 		font-family:
 			-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
 	}
-	
+
 	/* Main Content Area - takes rest of space */
 	.main-content {
 		display: flex;
@@ -1598,7 +1691,8 @@
 	}
 
 	@keyframes pulse-glow {
-		0%, 100% {
+		0%,
+		100% {
 			opacity: 1;
 			box-shadow: 0 0 4px rgba(16, 185, 129, 0.6);
 		}
