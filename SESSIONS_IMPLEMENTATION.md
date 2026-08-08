@@ -17,19 +17,19 @@ operations:
 
 ```typescript
 interface ChatMessage {
-  role: "user" | "assistant" | "system";
-  text: string;
-  timestamp: number;
+	role: 'user' | 'assistant' | 'system';
+	text: string;
+	timestamp: number;
 }
 
 interface ChatSession {
-  id: string;
-  repository: string;
-  title: string;
-  messages: ChatMessage[];
-  createdAt: number;
-  updatedAt: number;
-  lastMessagePreview?: string;
+	id: string;
+	repository: string;
+	title: string;
+	messages: ChatMessage[];
+	createdAt: number;
+	updatedAt: number;
+	lastMessagePreview?: string;
 }
 ```
 
@@ -77,14 +77,14 @@ Updated `src/lib/LiveChat.svelte` to fully integrate session management:
 **Imports & Dependencies**
 
 ```typescript
-import SessionsPanel from "./SessionsPanel.svelte";
+import SessionsPanel from './SessionsPanel.svelte';
 import {
-  type ChatMessage,
-  type ChatSession,
-  currentSession,
-  sessionStore,
-} from "./stores/sessionStore";
-import { repoStore } from "./stores/repoStore";
+	type ChatMessage,
+	type ChatSession,
+	currentSession,
+	sessionStore
+} from './stores/sessionStore';
+import { repoStore } from './stores/repoStore';
 ```
 
 **Repository Change Effect**

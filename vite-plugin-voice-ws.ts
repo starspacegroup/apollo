@@ -132,7 +132,10 @@ function setupOpenAIConnection(clientWs: WebSocket, OPENAI_API_KEY: string, repo
 		if (clientWs.readyState === WebSocket.OPEN) {
 			// Use 1000 (normal closure) if code is invalid or reserved (1005, 1006, 1015)
 			const reservedCodes = [1005, 1006, 1015];
-			const closeCode = typeof code === 'number' && code >= 1000 && code <= 4999 && !reservedCodes.includes(code) ? code : 1000;
+			const closeCode =
+				typeof code === 'number' && code >= 1000 && code <= 4999 && !reservedCodes.includes(code)
+					? code
+					: 1000;
 			clientWs.close(closeCode, reason.toString());
 		}
 	});
@@ -143,7 +146,10 @@ function setupOpenAIConnection(clientWs: WebSocket, OPENAI_API_KEY: string, repo
 		if (openaiWs.readyState === WebSocket.OPEN) {
 			// Use 1000 (normal closure) if code is invalid or reserved (1005, 1006, 1015)
 			const reservedCodes = [1005, 1006, 1015];
-			const closeCode = typeof code === 'number' && code >= 1000 && code <= 4999 && !reservedCodes.includes(code) ? code : 1000;
+			const closeCode =
+				typeof code === 'number' && code >= 1000 && code <= 4999 && !reservedCodes.includes(code)
+					? code
+					: 1000;
 			openaiWs.close(closeCode, reason.toString());
 		}
 	});

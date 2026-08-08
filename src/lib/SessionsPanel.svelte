@@ -1,5 +1,10 @@
 <script lang="ts">
-	import { sessionStore, allSessions, currentSession, type ChatSession } from './stores/sessionStore';
+	import {
+		sessionStore,
+		allSessions,
+		currentSession,
+		type ChatSession
+	} from './stores/sessionStore';
 	import { onMount } from 'svelte';
 	import { signOut } from '@auth/sveltekit/client';
 	import CommandPalette from './CommandPalette.svelte';
@@ -29,7 +34,7 @@
 	// Load collapsed state from localStorage on mount
 	onMount(() => {
 		const savedState = localStorage.getItem('sidebarCollapsed');
-		
+
 		// On mobile/tablet, default to collapsed unless explicitly expanded
 		if (window.innerWidth <= 768) {
 			isCollapsed = savedState === 'false' ? false : true;
@@ -44,7 +49,7 @@
 			if (e.key === 'Escape' && !isCollapsed && window.innerWidth <= 768) {
 				toggleCollapsed();
 			}
-			
+
 			// Ctrl+K or Cmd+K for command palette
 			if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
 				e.preventDefault();
@@ -58,7 +63,7 @@
 				const target = e.target as Node;
 				const userMenu = document.querySelector('.user-dropdown');
 				const userButton = userMenuButton;
-				
+
 				if (userMenu && !userMenu.contains(target) && userButton && !userButton.contains(target)) {
 					showUserMenu = false;
 				}
@@ -67,7 +72,7 @@
 
 		window.addEventListener('keydown', handleKeyDown);
 		document.addEventListener('click', handleClickOutside);
-		
+
 		return () => {
 			window.removeEventListener('keydown', handleKeyDown);
 			document.removeEventListener('click', handleClickOutside);
@@ -188,13 +193,13 @@
 
 	function handleNavClick(navId: string) {
 		activeNav = navId;
-		
+
 		// Handle navigation actions
 		if (navId === 'chat') {
 			// Navigate to root for new chat and clear current session
 			sessionStore.clearCurrentSession();
 			goto('/');
-			
+
 			// Close sidebar on mobile after navigation
 			if (window.innerWidth <= 480) {
 				isCollapsed = true;
@@ -204,13 +209,13 @@
 			sessionStore.clearCurrentSession();
 			goto('/');
 			onStartVoice();
-			
+
 			// Close sidebar on mobile after navigation
 			if (window.innerWidth <= 480) {
 				isCollapsed = true;
 			}
 		}
-		
+
 		console.log('Navigation clicked:', navId);
 	}
 
@@ -218,13 +223,12 @@
 		console.log('Menu clicked:', menuId);
 		// Handle menu actions
 	}
-
 </script>
 
 <!-- Mobile backdrop overlay -->
 {#if !isCollapsed}
-	<div 
-		class="sidebar-backdrop" 
+	<div
+		class="sidebar-backdrop"
 		onclick={toggleCollapsed}
 		onkeydown={(e) => e.key === 'Enter' && toggleCollapsed()}
 		role="button"
@@ -240,8 +244,22 @@
 	</div>
 
 	<!-- Search -->
-	<div class="sidebar-search" onclick={() => commandPaletteOpen = true} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && (commandPaletteOpen = true)}>
-		<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+	<div
+		class="sidebar-search"
+		onclick={() => (commandPaletteOpen = true)}
+		role="button"
+		tabindex="0"
+		onkeydown={(e) => e.key === 'Enter' && (commandPaletteOpen = true)}
+	>
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			width="16"
+			height="16"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+		>
 			<circle cx="11" cy="11" r="8"></circle>
 			<path d="m21 21-4.35-4.35"></path>
 		</svg>
@@ -251,18 +269,34 @@
 	<!-- Navigation Items -->
 	<nav class="sidebar-nav">
 		{#each navItems as item}
-			<button 
-				class="nav-item" 
+			<button
+				class="nav-item"
 				class:active={activeNav === item.id}
 				onclick={() => handleNavClick(item.id)}
 				title={item.label}
 			>
 				{#if item.icon === 'chat'}
-					<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
 						<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
 					</svg>
 				{:else if item.icon === 'voice'}
-					<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
 						<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
 						<path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
 						<line x1="12" y1="19" x2="12" y2="23"></line>
@@ -277,7 +311,15 @@
 	<!-- History Section -->
 	<div class="sidebar-section">
 		<div class="section-header">
-			<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				width="16"
+				height="16"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+			>
 				<circle cx="12" cy="12" r="10"></circle>
 				<polyline points="12 6 12 12 16 14"></polyline>
 			</svg>
@@ -314,28 +356,54 @@
 	<div class="sidebar-footer">
 		<!-- User Menu -->
 		{#if session?.user}
-			<button 
-				class="menu-item user-item" 
-				onclick={() => showUserMenu = !showUserMenu}
+			<button
+				class="menu-item user-item"
+				onclick={() => (showUserMenu = !showUserMenu)}
 				bind:this={userMenuButton}
 			>
 				{#if session.user.image}
-					<img src={session.user.image} alt={session.user.name || 'User'} class="user-avatar-small" />
+					<img
+						src={session.user.image}
+						alt={session.user.name || 'User'}
+						class="user-avatar-small"
+					/>
 				{:else}
 					<div class="user-avatar-placeholder">
 						{session.user.name?.charAt(0) || session.user.username?.charAt(0) || 'U'}
 					</div>
 				{/if}
 				<span class="menu-label">{session.user.name || session.user.username}</span>
-				<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron-up" class:open={showUserMenu}>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					width="14"
+					height="14"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					class="chevron-up"
+					class:open={showUserMenu}
+				>
 					<polyline points="18 15 12 9 6 15"></polyline>
 				</svg>
 			</button>
 		{/if}
 
 		<!-- Collapse/Expand Toggle -->
-		<button class="menu-item collapse-btn" onclick={toggleCollapsed} title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
-			<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+		<button
+			class="menu-item collapse-btn"
+			onclick={toggleCollapsed}
+			title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+		>
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				width="18"
+				height="18"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+			>
 				<polyline points="11 17 6 12 11 7"></polyline>
 				<polyline points="18 17 13 12 18 7"></polyline>
 			</svg>
@@ -346,12 +414,17 @@
 
 <!-- User Menu Popout (rendered outside sidebar) -->
 {#if session?.user && showUserMenu}
-	<div class="user-dropdown" style="
+	<div
+		class="user-dropdown"
+		style="
 		position: fixed;
-		bottom: {userMenuButton ? window.innerHeight - userMenuButton.getBoundingClientRect().top + 8 : 0}px;
+		bottom: {userMenuButton
+			? window.innerHeight - userMenuButton.getBoundingClientRect().top + 8
+			: 0}px;
 		left: {userMenuButton ? userMenuButton.getBoundingClientRect().left : 0}px;
 		width: {userMenuButton ? userMenuButton.getBoundingClientRect().width : 200}px;
-	">
+	"
+	>
 		<button
 			class="dropdown-item"
 			onclick={() => {
@@ -359,7 +432,15 @@
 				showUserMenu = false;
 			}}
 		>
-			<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				width="16"
+				height="16"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+			>
 				<circle cx="12" cy="12" r="3"></circle>
 				<path d="M12 1v6m0 6v10m10-10h-6m-6 0H1"></path>
 			</svg>
@@ -372,7 +453,15 @@
 				showUserMenu = false;
 			}}
 		>
-			<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				width="16"
+				height="16"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+			>
 				<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
 			</svg>
 			<span>Upgrade plan</span>
@@ -384,7 +473,15 @@
 				showUserMenu = false;
 			}}
 		>
-			<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				width="16"
+				height="16"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+			>
 				<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
 				<polyline points="16 17 21 12 16 7"></polyline>
 				<line x1="21" y1="12" x2="9" y2="12"></line>
@@ -395,11 +492,7 @@
 {/if}
 
 <!-- Command Palette -->
-<CommandPalette 
-	bind:isOpen={commandPaletteOpen}
-	{onSessionSelect}
-	{onNewSession}
-/>
+<CommandPalette bind:isOpen={commandPaletteOpen} {onSessionSelect} {onNewSession} />
 
 <style>
 	.sidebar-backdrop {
@@ -852,4 +945,3 @@
 		}
 	}
 </style>
-

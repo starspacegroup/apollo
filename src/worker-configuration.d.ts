@@ -5,6 +5,7 @@ declare namespace Cloudflare {
 	interface Env {
 		ASSETS: Fetcher;
 		OPENAI_API_KEY?: string;
+		DB: D1Database;
 	}
 }
 interface Env extends Cloudflare.Env {}

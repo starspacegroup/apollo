@@ -80,8 +80,7 @@
 		const query = searchQuery.toLowerCase();
 		return commands.filter(
 			(cmd) =>
-				cmd.label.toLowerCase().includes(query) ||
-				cmd.description.toLowerCase().includes(query)
+				cmd.label.toLowerCase().includes(query) || cmd.description.toLowerCase().includes(query)
 		);
 	});
 
@@ -158,7 +157,13 @@
 </script>
 
 {#if isOpen}
-	<div class="command-palette-backdrop" onclick={close} onkeydown={(e) => e.key === 'Enter' && close()} role="button" tabindex="-1">
+	<div
+		class="command-palette-backdrop"
+		onclick={close}
+		onkeydown={(e) => e.key === 'Enter' && close()}
+		role="button"
+		tabindex="-1"
+	>
 		<div
 			class="command-palette"
 			onclick={(e) => e.stopPropagation()}
@@ -231,9 +236,7 @@
 										stroke="currentColor"
 										stroke-width="2"
 									>
-										<path
-											d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
-										></path>
+										<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
 									</svg>
 								{:else if command.icon === 'voice'}
 									<svg
@@ -245,9 +248,7 @@
 										stroke="currentColor"
 										stroke-width="2"
 									>
-										<path
-											d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"
-										></path>
+										<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
 										<path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
 										<line x1="12" y1="19" x2="12" y2="23"></line>
 										<line x1="8" y1="23" x2="16" y2="23"></line>
@@ -491,7 +492,10 @@
 		background: #0a0a0a;
 		border: 1px solid #2a2a2a;
 		border-radius: 0.25rem;
-		font-family: system-ui, -apple-system, sans-serif;
+		font-family:
+			system-ui,
+			-apple-system,
+			sans-serif;
 		font-size: 0.75rem;
 		color: #999;
 		min-width: 24px;
