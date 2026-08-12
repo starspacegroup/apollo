@@ -11,6 +11,7 @@
 		type ChatMessage
 	} from './stores/sessionStore';
 	import { repoStore } from './stores/repoStore';
+	import { shouldClearResponseState } from './realtimeResponseState';
 	import { goto } from '$app/navigation';
 
 	// Accept repository as a prop
@@ -392,9 +393,16 @@
 							}
 						}
 						break;
-					case 'response.done':
+					case 'response.done': {
 						// Response completely finished
 						console.log('Response done:', data.response?.id);
+						// A terminal event for an older (e.g. cancelled) response can arrive
+						// after `response.created` for the current one. Clearing state then
+						// would drop every subsequent delta and the user would see no reply.
+						if (!shouldClearResponseState(data.response?.id, currentResponseId)) {
+							console.log('Ignoring stale response.done for', data.response?.id);
+							break;
+						}
 						processingResponse = false;
 						currentResponseId = null;
 
@@ -410,14 +418,22 @@
 							goto(`/c/${$currentSession.id}`, { replaceState: true });
 						}
 						break;
+					}
 
-					case 'response.cancelled':
+					case 'response.cancelled': {
 						// Response was cancelled
 						console.log('Response cancelled:', data.response?.id);
+						// Ignore cancellations for responses we are no longer tracking, so a
+						// late ack cannot silence (or cut the audio of) a newer response.
+						if (!shouldClearResponseState(data.response?.id, currentResponseId)) {
+							console.log('Ignoring stale response.cancelled for', data.response?.id);
+							break;
+						}
 						processingResponse = false;
 						currentResponseId = null;
 						cancelCurrentAudio();
 						break;
+					}
 
 					case 'response.audio.done':
 						// Audio stream is complete, let the queue finish naturally
