@@ -21,9 +21,9 @@ SvelteKit app! Follow these steps to complete the configuration.
 2. Click "New OAuth App"
 3. Fill in the details:
    - **Application name**: Apollo App (or your preferred name)
-   - **Homepage URL**: `http://localhost:5173` (for development)
+   - **Homepage URL**: `http://localhost:8787/` (for development)
    - **Authorization callback URL**:
-     `http://localhost:5173/auth/callback/github`
+     `http://localhost:8787/auth/callback/github`
 4. Click "Register application"
 5. On the next page, click "Generate a new client secret"
 6. **Copy both the Client ID and Client Secret** - you'll need these next!
@@ -42,7 +42,7 @@ AUTH_SECRET=your_random_secret_here
 
 # Keep these as-is for development
 AUTH_TRUST_HOST=true
-ORIGIN=http://localhost:5173
+ORIGIN=http://localhost:8787
 ```
 
 **Generate AUTH_SECRET:**
@@ -92,7 +92,7 @@ When deploying to production:
 npm run dev
 ```
 
-Visit `http://localhost:5173` and click "Sign in with GitHub"
+Visit `http://localhost:8787/` and click "Sign in with GitHub"
 
 ### Preview/Production Mode
 

@@ -18,14 +18,14 @@ performance 🌐 **SvelteKit** - Modern full-stack framework with excellent DX
 2. **Run setup script**: `.\setup-voice-chat.ps1` (or manually create
    `.dev.vars`)
 3. **Start dev server**: `npm run dev`
-4. **Open chat**: Navigate to `http://localhost:5173/chat`
+4. **Open chat**: Navigate to `http://localhost:8787/`
 
 For detailed instructions, see [VOICE_CHAT_README.md](./VOICE_CHAT_README.md)
 
 ## Developing
 
-Once you've created a project and installed dependencies with `npm install` (or
-`pnpm install` or `yarn`), start a development server:
+Once you've created a project and installed dependencies with `npm install`,
+start a development server:
 
 ```sh
 npm run dev

@@ -1,6 +1,6 @@
 /**
  * Tests for Session API endpoints
- * 
+ *
  * These tests verify the database integration and API functionality.
  * They require authentication to run.
  */
@@ -12,7 +12,7 @@ describe('Session API Endpoints', () => {
 	// 1. A test database
 	// 2. Mock authentication
 	// 3. Test environment setup
-	
+
 	it.skip('should create a new session', async () => {
 		// Test POST /api/sessions
 		// Verify session is created in database

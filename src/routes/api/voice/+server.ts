@@ -12,6 +12,7 @@ import {
 	updateGitHubIssue,
 	getRepositoryTree
 } from '$lib/github-helpers';
+import { openAIRealtimeUrl, relayCloseCode, voiceSessionConfig } from '$lib/server/voiceProtocol';
 
 const GITHUB_ASSISTANT_SYSTEM_PROMPT = `You are Apollo, a GitHub assistant with direct access to repository tools.
 
@@ -44,10 +45,7 @@ async function setupOpenAIConnection(
 	accessToken?: string
 ) {
 	// Connect to OpenAI Realtime API
-	const url = new URL('wss://api.openai.com/v1/realtime');
-	url.searchParams.set('model', 'gpt-4o-mini-realtime-preview');
-
-	const openaiWs = new WebSocket(url.toString(), [
+	const openaiWs = new WebSocket(openAIRealtimeUrl(), [
 		'realtime',
 		`openai-insecure-api-key.${OPENAI_API_KEY}`,
 		'openai-beta.realtime-v1'
@@ -381,27 +379,7 @@ async function setupOpenAIConnection(
 		];
 
 		// Send session configuration
-		const sessionConfig = {
-			type: 'session.update',
-			session: {
-				modalities: ['text', 'audio'],
-				instructions,
-				voice: 'alloy',
-				input_audio_format: 'pcm16',
-				output_audio_format: 'pcm16',
-				input_audio_transcription: {
-					model: 'whisper-1'
-				},
-				turn_detection: {
-					type: 'server_vad',
-					threshold: 0.6,
-					prefix_padding_ms: 300,
-					silence_duration_ms: 800
-				},
-				tools,
-				tool_choice: 'auto' // Enable automatic tool calling
-			}
-		};
+		const sessionConfig = voiceSessionConfig(instructions, tools);
 
 		console.log('Sending session config with', tools.length, 'tools for repository:', repository);
 		console.log('Tool choice:', sessionConfig.session.tool_choice);
@@ -424,7 +402,7 @@ async function setupOpenAIConnection(
 		if (clientWs.readyState === WebSocket.OPEN) {
 			// Use a valid close code (1000 = normal closure, or 1001-1003 for other cases)
 			// Don't use reserved codes like 1005, 1006, etc.
-			const closeCode = event.code >= 1000 && event.code <= 1003 ? event.code : 1000;
+			const closeCode = relayCloseCode(event.code);
 			clientWs.close(closeCode, event.reason || 'Connection closed');
 		}
 	});
@@ -434,7 +412,7 @@ async function setupOpenAIConnection(
 		console.log('Client connection closed:', event.code, event.reason);
 		if (openaiWs.readyState === WebSocket.OPEN) {
 			// Use a valid close code
-			const closeCode = event.code >= 1000 && event.code <= 1003 ? event.code : 1000;
+			const closeCode = relayCloseCode(event.code);
 			openaiWs.close(closeCode, event.reason || 'Connection closed');
 		}
 	});

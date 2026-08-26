@@ -5,7 +5,7 @@
 1. **Get GitHub OAuth Credentials**
    - Visit: https://github.com/settings/developers
    - Click: "New OAuth App"
-   - Set callback URL: `http://localhost:5173/auth/callback/github`
+   - Set callback URL: `http://localhost:8787/auth/callback/github`
    - Copy your Client ID and Client Secret
 
 2. **Update `.env` file**
@@ -28,7 +28,7 @@
    npm run dev
    ```
 
-5. **Test it**: Visit http://localhost:5173 and click "Sign in with GitHub"
+5. **Test it**: Visit http://localhost:8787/ and click "Sign in with GitHub"
 
 ## 📖 Full Documentation
 

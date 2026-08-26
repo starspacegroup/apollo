@@ -15,7 +15,7 @@
 
 **Steps**:
 
-1. Open `http://localhost:8787/chat` in browser
+1. Open `http://localhost:8787/` in browser
 2. Verify initial state shows "Ready" status
 3. Verify empty state message shows both text and voice options
 4. Type "Hello, can you help me?" in the text input
