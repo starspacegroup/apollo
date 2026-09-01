@@ -7,7 +7,7 @@
  * because two hand-written definitions drift. Until then `schema` is the guard:
  * the page checks it and says so rather than rendering a shape it half knows.
  */
-export const SCHEMA = 1;
+export const SCHEMA = 2;
 
 export interface Meters {
 	five_hour: number;
@@ -74,6 +74,42 @@ export interface Reconciled {
 	ambiguous: number;
 }
 
+export interface Attend {
+	id: number;
+	kind: string;
+	subject: string;
+	detail: string;
+	at: string;
+}
+
+export interface Decided {
+	at: string;
+	handle: string;
+	project: string;
+	verdict: 'started' | 'withheld' | 'refused' | 'deferred' | 'coalesced';
+	reason: string;
+	repeats: number;
+}
+
+/**
+ * What the browser asked the machine for, and what it said back.
+ *
+ * `state` is the honest part. A card does not move because this page asked; it
+ * moves when the machine answers. `pending` and `delivered` both mean "asked";
+ * `applied` and `refused` are the machine's own words, and a refusal carries
+ * the reason — "autonomy is off here", "quiet hours", "the weekly window is at
+ * 48% against a 40% ceiling".
+ */
+export interface AskedFor {
+	id: string;
+	kind: string;
+	payload: Record<string, unknown>;
+	created_at: number;
+	created_by: string;
+	state: 'pending' | 'delivered' | 'applied' | 'refused' | 'expired';
+	detail: string | null;
+}
+
 export interface Board {
 	schema: number;
 	generated_at: string;
@@ -84,6 +120,12 @@ export interface Board {
 	actors: Actor[];
 	characters: Character[];
 	reconciled: Reconciled;
+	autonomy: 'off' | 'propose' | 'supervised' | 'autonomous';
+	paused_until: string | null;
+	gate_ok: boolean;
+	gate_detail: string;
+	attention: Attend[];
+	decisions: Decided[];
 	caveats: string[];
 }
 
@@ -99,6 +141,12 @@ export function emptyBoard(reason: string): Board {
 		actors: [],
 		characters: [],
 		reconciled: { local: 0, remote: 0, matched: 0, ghosts: 0, orphans: 0, ambiguous: 0 },
+		autonomy: 'off',
+		paused_until: null,
+		gate_ok: false,
+		gate_detail: 'no snapshot has reached this Worker',
+		attention: [],
+		decisions: [],
 		caveats: [reason]
 	};
 }
@@ -118,6 +166,20 @@ export function ago(iso: string | null): string {
 	if (s < 3600) return `${Math.round(s / 60)}m`;
 	if (s < 86400) return `${Math.round(s / 3600)}h`;
 	return `${Math.round(s / 86400)}d`;
+}
+
+/** What the dial means, in the words `apollo autonomy` uses. */
+export function autonomyMeans(level: Board['autonomy']): string {
+	switch (level) {
+		case 'off':
+			return 'nothing starts itself';
+		case 'propose':
+			return 'writes down what it would have started; starts nothing';
+		case 'supervised':
+			return 'starts work that cannot write; anything that writes waits for you';
+		case 'autonomous':
+			return 'starts work that writes to a branch; never merges, never deploys';
+	}
 }
 
 export function projectSummary(p: Project): string {

@@ -1,6 +1,15 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { ago, projectSummary, shortModel, SCHEMA, type Actor, type Project } from '$lib/board';
+	import {
+		ago,
+		autonomyMeans,
+		projectSummary,
+		shortModel,
+		SCHEMA,
+		type Actor,
+		type AskedFor,
+		type Project
+	} from '$lib/board';
 
 	let { data }: { data: PageData } = $props();
 	const board = $derived(data.board);
@@ -39,6 +48,65 @@
 	let selected: Card | null = $state(null);
 
 	const meters = $derived(board.meters);
+
+	/* ── the write half ──────────────────────────────────────────────────────
+	 *
+	 * The rule this UI has to tell the truth about: **asking is not doing.**
+	 *
+	 * plans/dirac-bridge.md §4 — Apollo may request work, it may never
+	 * authorise it. So a button here does not move a card. It writes down that
+	 * somebody asked; the daemon collects it; the local conductor decides under
+	 * David's dial, the gate, the quota and the fleet switches. The card moves
+	 * when the *machine* says it moved, and if the machine says no it says why.
+	 *
+	 * The temptation is an optimistic update — move the card, look responsive,
+	 * reconcile later. That would be a lie roughly half the time on a fleet
+	 * whose whole point is that it refuses things, and the refusals are the
+	 * interesting part. So: `asked` is its own state, visibly not `done`.
+	 */
+	let asked: AskedFor[] = $state([]);
+	let asking = $state(false);
+	let askError: string | null = $state(null);
+	let askCharacter = $state('');
+
+	async function refreshAsked() {
+		try {
+			const r = await fetch('/api/intents');
+			if (!r.ok) return;
+			asked = ((await r.json()) as { intents: AskedFor[] }).intents ?? [];
+		} catch {
+			/* offline is a normal state for this page */
+		}
+	}
+
+	async function ask(kind: string, payload: Record<string, unknown>) {
+		asking = true;
+		askError = null;
+		try {
+			const r = await fetch('/api/intents', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ kind, payload })
+			});
+			const body = (await r.json()) as { error?: string; intent?: AskedFor };
+			if (!r.ok || body.error) {
+				askError = body.error ?? `the request was refused (${r.status})`;
+				return;
+			}
+			if (body.intent) asked = [body.intent, ...asked];
+		} catch (e) {
+			askError = e instanceof Error ? e.message : String(e);
+		} finally {
+			asking = false;
+		}
+	}
+
+	$effect(() => {
+		refreshAsked();
+	});
+
+	const canStart = $derived(board.autonomy === 'supervised' || board.autonomy === 'autonomous');
+	const paused = $derived(!!board.paused_until && Date.parse(board.paused_until) > Date.now());
 
 	function accent(c: Card): string {
 		if (c.kind === 'actor') return c.actor.state === 'working' ? 'green' : 'dim';
@@ -109,8 +177,39 @@
 				<span class="chip faint">no meter sample</span>
 			{/if}
 			<span class="chip live"><i></i>{board.actors.length} running</span>
+			<span class="chip dial {board.autonomy}" title={autonomyMeans(board.autonomy)}>
+				{board.autonomy}
+			</span>
+			<span class="chip" class:hot={!board.gate_ok} title={board.gate_detail}>
+				gate <b>{board.gate_ok ? 'ok' : 'no'}</b>
+			</span>
+			{#if paused}
+				<span class="chip hot">paused until {new Date(board.paused_until!).toLocaleTimeString()}</span>
+			{:else}
+				<button class="chip act" disabled={asking} onclick={() => ask('pause', { minutes: 120 })}>
+					pause 2h
+				</button>
+			{/if}
 		</div>
 	</header>
+
+	{#if board.attention.length > 0}
+		<section class="attention">
+			<h2>Needs a person<span class="count">{board.attention.length}</span></h2>
+			{#each board.attention as a}
+				<div class="item {a.kind}">
+					<span class="k">{a.kind}</span>
+					<span class="s">{a.subject}</span>
+					<span class="d">{a.detail}</span>
+					<button
+						class="seen"
+						disabled={asking}
+						onclick={() => ask('attention.resolve', { id: a.id })}>mark seen</button
+					>
+				</div>
+			{/each}
+		</section>
+	{/if}
 
 	{#if board.schema !== SCHEMA}
 		<p class="warn">
@@ -165,12 +264,83 @@
 			{:else}
 				<p class="hint">Pick a card.</p>
 			{/if}
-			<p class="readonly">
-				Read-only. A column move needs the write half, and starting a run needs the bridge —
-				neither exists yet, so this board changes nothing.
-			</p>
+			{#if selected?.kind === 'project'}
+				<div class="ask">
+					<h4>Ask for work on this</h4>
+					<label>
+						<span>character</span>
+						<select bind:value={askCharacter}>
+							<option value="">choose…</option>
+							{#each board.characters as c}
+								<option value={c.handle}>{c.display} — {c.wakes}</option>
+							{/each}
+						</select>
+					</label>
+					<button
+						class="do"
+						disabled={!askCharacter || asking}
+						onclick={() =>
+							selected?.kind === 'project' &&
+							ask('work.request', {
+								project: selected.project.name,
+								character: askCharacter,
+								note: 'asked from the board'
+							})}
+					>
+						{asking ? 'asking…' : 'Ask'}
+					</button>
+					{#if askError}<p class="err">{askError}</p>{/if}
+					<p class="note">
+						This asks. It does not start anything. The machine decides — under the dial, the
+						gate, the quota and the fleet switches — and answers below.
+						{#if !canStart}
+							Autonomy is <b>{board.autonomy}</b>, so this will be recorded and refused until
+							the dial is turned at the terminal.
+						{/if}
+					</p>
+				</div>
+			{/if}
 		</aside>
 	</div>
+
+	{#if asked.length > 0}
+		<section class="asked">
+			<h2>Asked for</h2>
+			{#each asked.slice(0, 8) as a}
+				<div class="row {a.state}">
+					<span class="st">{a.state}</span>
+					<span class="kd">{a.kind}</span>
+					<span class="pl">
+						{a.payload.project ?? ''}
+						{a.payload.character ? `· ${a.payload.character}` : ''}
+					</span>
+					<span class="dt">{a.detail ?? 'waiting for the machine to collect it'}</span>
+				</div>
+			{/each}
+			<p class="note">
+				`applied` and `refused` are the machine's own words. A request nobody collects within a
+				day expires rather than waiting forever.
+			</p>
+		</section>
+	{/if}
+
+	{#if board.decisions.length > 0}
+		<section class="decisions">
+			<h2>What the conductor decided</h2>
+			{#each board.decisions.slice(0, 8) as d}
+				<div class="row {d.verdict}">
+					<span class="st">{d.verdict}</span>
+					<span class="kd">{d.handle}</span>
+					<span class="pl">{d.project}</span>
+					<span class="dt">{d.reason}{d.repeats > 1 ? ` ×${d.repeats}` : ''}</span>
+				</div>
+			{/each}
+			<p class="note">
+				Every no is here on purpose. A run that never started is still a fact — otherwise a fleet
+				that quietly does less than you think looks exactly like one that is working.
+			</p>
+		</section>
+	{/if}
 
 	<footer>
 		<div class="rec">
@@ -358,5 +528,86 @@
 			border: 1px solid var(--rule); border-radius: 0.75rem; background: rgba(11, 18, 32, 0.5);
 		}
 	}
+
+	/* ── the write half ─────────────────────────────────────────────────────
+	 *
+	 * Every state in here is coloured by what it *means*, not by whether the
+	 * click worked. `asked` is amber because it is unfinished; `refused` is red
+	 * and keeps its reason on screen; `applied` is the only green. A UI that
+	 * greened the button on a successful POST would be reporting that the
+	 * browser was heard, which is not the question anyone is asking. */
+	.chip.act {
+		font: inherit; font-family: var(--mono); font-size: var(--t-xs);
+		background: transparent; color: var(--dim); cursor: pointer;
+		border: 1px solid var(--rule2); border-radius: 999px; padding: 0.3rem 0.7rem;
+		min-height: 2rem;
+	}
+	.chip.act:hover:not(:disabled) { color: var(--amber); border-color: rgba(255, 177, 78, 0.5); }
+	.chip.act:disabled { opacity: 0.5; cursor: default; }
+	.chip.dial { text-transform: lowercase; letter-spacing: 0.04em; }
+	.chip.dial.off { color: var(--faint); }
+	.chip.dial.propose { color: var(--cyan); border-color: rgba(89, 217, 255, 0.4); }
+	.chip.dial.supervised { color: var(--green); border-color: rgba(122, 215, 160, 0.4); }
+	.chip.dial.autonomous { color: var(--amber); border-color: rgba(255, 177, 78, 0.5); }
+
+	.attention, .asked, .decisions {
+		padding: 0.8rem var(--pad); border-bottom: 1px solid var(--rule);
+	}
+	.attention h2, .asked h2, .decisions h2 {
+		margin: 0 0 0.5rem; font-size: var(--t-sm); font-weight: 600; color: var(--dim);
+		text-transform: uppercase; letter-spacing: 0.08em;
+	}
+	.attention .item {
+		display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem;
+		padding: 0.45rem 0; border-top: 1px solid var(--rule); font-size: var(--t-sm);
+	}
+	.attention .k {
+		font-family: var(--mono); font-size: var(--t-xs); text-transform: uppercase;
+		color: var(--amber); min-width: 5rem;
+	}
+	.attention .item.gate .k, .attention .item.failure .k { color: var(--red); }
+	.attention .s { color: var(--bright); font-weight: 600; }
+	.attention .d { color: var(--dim); flex: 1 1 14rem; }
+	.attention .seen {
+		font: inherit; font-size: var(--t-xs); background: transparent; color: var(--faint);
+		border: 1px solid var(--rule2); border-radius: 999px; padding: 0.25rem 0.6rem;
+		cursor: pointer; min-height: 1.9rem;
+	}
+	.attention .seen:hover:not(:disabled) { color: var(--cyan); }
+
+	.asked .row, .decisions .row {
+		display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: baseline;
+		padding: 0.35rem 0; border-top: 1px solid var(--rule); font-size: var(--t-sm);
+	}
+	.asked .st, .decisions .st {
+		font-family: var(--mono); font-size: var(--t-xs); min-width: 5.5rem;
+		text-transform: uppercase; color: var(--amber);
+	}
+	.asked .row.applied .st, .decisions .row.started .st { color: var(--green); }
+	.asked .row.refused .st, .decisions .row.refused .st { color: var(--red); }
+	.asked .row.expired .st, .decisions .row.coalesced .st { color: var(--faint); }
+	.decisions .row.withheld .st { color: var(--cyan); }
+	.asked .kd, .decisions .kd { color: var(--bright); font-family: var(--mono); font-size: var(--t-xs); }
+	.asked .pl, .decisions .pl { color: var(--dim); }
+	.asked .dt, .decisions .dt { color: var(--faint); flex: 1 1 12rem; }
+	.note { margin: 0.5rem 0 0; font-size: var(--t-xs); color: var(--faint); line-height: 1.5; }
+
+	.ask { border-top: 1px solid var(--rule); margin-top: 0.9rem; padding-top: 0.9rem; }
+	.ask h4 { margin: 0 0 0.6rem; font-size: var(--t-sm); color: var(--dim); }
+	.ask label { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.6rem; }
+	.ask label span { font-size: var(--t-xs); color: var(--faint); font-family: var(--mono); }
+	.ask select {
+		font: inherit; font-size: var(--t-sm); min-height: 2.4rem;
+		background: var(--void); color: var(--text);
+		border: 1px solid var(--rule2); border-radius: 0.4rem; padding: 0.35rem 0.5rem;
+	}
+	.ask .do {
+		font: inherit; font-size: var(--t-sm); min-height: 2.4rem; width: 100%;
+		background: rgba(89, 217, 255, 0.12); color: var(--cyan);
+		border: 1px solid rgba(89, 217, 255, 0.5); border-radius: 0.4rem; cursor: pointer;
+	}
+	.ask .do:disabled { opacity: 0.45; cursor: default; }
+	.ask .err { margin: 0.5rem 0 0; font-size: var(--t-xs); color: var(--red); }
+
 </style>
 

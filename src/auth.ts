@@ -1,6 +1,20 @@
 import { SvelteKitAuth, type DefaultSession } from '@auth/sveltekit';
 import GitHub from '@auth/core/providers/github';
-import { GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, AUTH_SECRET } from '$env/static/private';
+import { env } from '$env/dynamic/private';
+
+/**
+ * `$env/dynamic/private`, not `$env/static/private`.
+ *
+ * plans/revival.md §2.2, and docs/state-of-the-build.md names it as the one
+ * real breakage in the dormant half: the static import BAKES THESE VALUES INTO
+ * THE BUNDLE AT BUILD TIME. On a Worker, secrets come from the platform at
+ * runtime — so the static form both fails the build when they are absent and
+ * ships them inside the artifact when they are present. Two bad outcomes from
+ * one import.
+ */
+const GITHUB_CLIENT_ID = env.GITHUB_CLIENT_ID ?? '';
+const GITHUB_CLIENT_SECRET = env.GITHUB_CLIENT_SECRET ?? '';
+const AUTH_SECRET = env.AUTH_SECRET ?? '';
 
 declare module '@auth/sveltekit' {
 	interface Session {
