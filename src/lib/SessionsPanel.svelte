@@ -8,6 +8,7 @@
 	import { onMount } from 'svelte';
 	import { signOut } from '@auth/sveltekit/client';
 	import CommandPalette from './CommandPalette.svelte';
+	import { paletteOpen } from './stores/palette';
 	import { goto } from '$app/navigation';
 
 	let {
@@ -29,7 +30,6 @@
 	let showUserMenu = $state(false);
 	let activeNav = $state('chat'); // Default to chat view
 	let userMenuButton = $state<HTMLButtonElement | null>(null);
-	let commandPaletteOpen = $state(false);
 
 	// Load collapsed state from localStorage on mount
 	onMount(() => {
@@ -53,7 +53,7 @@
 			// Ctrl+K or Cmd+K for command palette
 			if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
 				e.preventDefault();
-				commandPaletteOpen = !commandPaletteOpen;
+				paletteOpen.update((v) => !v);
 			}
 		};
 
@@ -246,10 +246,10 @@
 	<!-- Search -->
 	<div
 		class="sidebar-search"
-		onclick={() => (commandPaletteOpen = true)}
+		onclick={() => paletteOpen.set(true)}
 		role="button"
 		tabindex="0"
-		onkeydown={(e) => e.key === 'Enter' && (commandPaletteOpen = true)}
+		onkeydown={(e) => e.key === 'Enter' && paletteOpen.set(true)}
 	>
 		<svg
 			xmlns="http://www.w3.org/2000/svg"
@@ -492,7 +492,7 @@
 {/if}
 
 <!-- Command Palette -->
-<CommandPalette bind:isOpen={commandPaletteOpen} {onSessionSelect} {onNewSession} />
+<CommandPalette bind:isOpen={$paletteOpen} {onSessionSelect} {onNewSession} />
 
 <style>
 	.sidebar-backdrop {

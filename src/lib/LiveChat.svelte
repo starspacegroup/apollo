@@ -12,6 +12,8 @@
 	} from './stores/sessionStore';
 	import { repoStore } from './stores/repoStore';
 	import { shouldClearResponseState } from './realtimeResponseState';
+	import Attachments, { type Attachment } from './Attachments.svelte';
+	import { registerPaletteActions } from './stores/palette';
 	import { goto } from '$app/navigation';
 
 	// Accept repository as a prop
@@ -53,6 +55,23 @@
 	let shouldCancelAudio = false;
 	let textMessage = $state('');
 	let textInputRef = $state<HTMLTextAreaElement>();
+	// Files and photographs waiting to go with the next message. They live here
+	// and nowhere else — see Attachments.svelte.
+	let attachments = $state<Attachment[]>([]);
+	let attachRef = $state<any>();
+	let dragging = $state(false);
+
+	/** A dropped or pasted file is the same thing as a picked one. */
+	async function takeFiles(files: FileList | File[] | null | undefined) {
+		await attachRef?.add(files);
+	}
+
+	function onPaste(event: ClipboardEvent) {
+		const files = Array.from(event.clipboardData?.files ?? []);
+		if (files.length === 0) return;
+		event.preventDefault();
+		takeFiles(files);
+	}
 	let audioProcessor: ScriptProcessorNode | null = null;
 	let messagesContainerRef = $state<HTMLDivElement>();
 	let connectedRepository = $state(''); // Track which repository we're connected to
@@ -171,8 +190,18 @@
 
 	// Auto-connect on mount only if repository is selected
 	onMount(() => {
-		// Connection will be handled by the $effect above
-		// Just setup cleanup handlers
+		// Connection will be handled by the $effect above.
+		// What the command palette may reach in here, and the undo. Registered
+		// on mount rather than declared in the palette, so a verb is offered
+		// only while this window is the one that can perform it.
+		return registerPaletteActions({
+			attach: () => attachRef?.pick(),
+			camera: () => attachRef?.openCamera(),
+			voice: () => {
+				if (!isVoiceMode) startVoiceChat();
+			},
+			changeRepo: () => changeRepo()
+		});
 	});
 
 	async function connectWebSocket() {
@@ -893,9 +922,10 @@
 	}
 
 	async function sendTextMessage() {
-		if (!textMessage.trim()) return;
+		// A photograph with no caption is still a message.
+		if (!textMessage.trim() && attachments.length === 0) return;
 
-		const message = textMessage.trim();
+		const message = textMessage.trim() || describeAttachments();
 		textMessage = '';
 
 		// Ensure we have an active session - create one if needed
@@ -950,22 +980,35 @@
 			return;
 		}
 
-		// Send text message as a conversation item
+		// Send the message as a conversation item. An attachment is a PART of that
+		// item, not an upload: images go as `input_image` with their data URL, and
+		// a text file is folded in as its own `input_text` block with the filename
+		// above it, so the model can tell the person's words from the file's.
+		const content: Array<Record<string, string>> = [{ type: 'input_text', text: message }];
+		for (const a of attachments) {
+			if (a.kind === 'image' && a.dataUrl) {
+				content.push({ type: 'input_image', image_url: a.dataUrl });
+			} else if (a.kind === 'text' && a.text !== undefined) {
+				content.push({
+					type: 'input_text',
+					text: `\n\n--- attached file: ${a.name} (${a.mime}) ---\n${a.text}\n--- end of ${a.name} ---`
+				});
+			}
+		}
+
 		const textEvent = {
 			type: 'conversation.item.create',
 			item: {
 				type: 'message',
 				role: 'user',
-				content: [
-					{
-						type: 'input_text',
-						text: message
-					}
-				]
+				content
 			}
 		};
 
 		ws.send(JSON.stringify(textEvent));
+		// Cleared only once it is on the wire: a failed send keeps them, so a
+		// photograph is not lost to a dropped connection.
+		attachments = [];
 
 		// Request response from AI (explicit for text messages)
 		console.log('Requesting AI response for text message');
@@ -973,6 +1016,16 @@
 
 		// Navigation will happen automatically in response.created handler
 		// This prevents interrupting the response stream
+	}
+
+	/** What a message says when a person sent only files. */
+	function describeAttachments(): string {
+		const images = attachments.filter((a) => a.kind === 'image').length;
+		const docs = attachments.length - images;
+		const bits: string[] = [];
+		if (images) bits.push(`${images} image${images === 1 ? '' : 's'}`);
+		if (docs) bits.push(`${docs} file${docs === 1 ? '' : 's'}`);
+		return `Here ${attachments.length === 1 ? 'is' : 'are'} ${bits.join(' and ')}.`;
 	}
 
 	function handleKeyDown(event: KeyboardEvent) {
@@ -1285,11 +1338,13 @@
 						<!-- Input field directly below "Connected to" -->
 						{#if transcript.length === 0}
 							<div class="welcome-input-wrapper">
+								<Attachments bind:this={attachRef} bind:attachments onerror={(m) => (error = m)} />
 								<textarea
 									bind:this={textInputRef}
 									bind:value={textMessage}
 									onkeydown={handleKeyDown}
-									placeholder="Message Apollo..."
+									onpaste={onPaste}
+									placeholder="Message Apollo…  drop a file, or use the camera"
 									rows="1"
 									class="message-input"
 								></textarea>
@@ -1297,7 +1352,7 @@
 								<button
 									class="send-btn"
 									onclick={sendTextMessage}
-									disabled={!textMessage.trim()}
+									disabled={!textMessage.trim() && attachments.length === 0}
 									title="Send message"
 								>
 									<svg
@@ -1490,13 +1545,29 @@
 					</div>
 				{/if}
 
-				<div class="input-wrapper">
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div
+					class="input-wrapper"
+					class:dragging
+					ondragover={(e) => {
+						e.preventDefault();
+						dragging = true;
+					}}
+					ondragleave={() => (dragging = false)}
+					ondrop={(e) => {
+						e.preventDefault();
+						dragging = false;
+						takeFiles(e.dataTransfer?.files);
+					}}
+				>
+					<Attachments bind:this={attachRef} bind:attachments onerror={(m) => (error = m)} />
 					<div class="input-controls">
 						<textarea
 							bind:this={textInputRef}
 							bind:value={textMessage}
 							onkeydown={handleKeyDown}
-							placeholder="Message Apollo..."
+							onpaste={onPaste}
+							placeholder="Message Apollo…  drop a file, or use the camera"
 							rows="1"
 							class="message-input"
 						></textarea>
@@ -1504,7 +1575,7 @@
 						<button
 							class="send-btn"
 							onclick={sendTextMessage}
-							disabled={!textMessage.trim()}
+							disabled={!textMessage.trim() && attachments.length === 0}
 							title="Send message"
 						>
 							<svg
@@ -2087,6 +2158,14 @@
 	.input-wrapper {
 		max-width: 900px;
 		margin: 0 auto;
+	}
+
+	/* A file being dragged over the composer. The border is the whole signal —
+	   a drop target that moves the layout under the cursor is a drop target
+	   people miss. */
+	.input-wrapper.dragging {
+		border-color: #4a9eff;
+		box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.25);
 	}
 
 	.input-controls {

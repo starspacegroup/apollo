@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { sessionStore, allSessions, type ChatSession } from './stores/sessionStore';
+	import { paletteActions } from './stores/palette';
 
 	let {
 		isOpen = $bindable(false),
@@ -53,6 +54,62 @@
 				}
 			}
 		];
+
+		// What the open chat can actually do, registered by it when it mounted.
+		// A command appears only while something is behind it.
+		const a = $paletteActions;
+		if (a.voice) {
+			baseCommands.push({
+				id: 'talk',
+				label: 'Talk to Apollo',
+				description: 'Realtime voice — speak and be answered aloud',
+				category: 'action',
+				icon: 'voice',
+				action: () => {
+					a.voice?.();
+					close();
+				}
+			});
+		}
+		if (a.attach) {
+			baseCommands.push({
+				id: 'attach',
+				label: 'Attach a file',
+				description: 'An image or a text file, into the next message',
+				category: 'action',
+				icon: 'chat',
+				action: () => {
+					a.attach?.();
+					close();
+				}
+			});
+		}
+		if (a.camera) {
+			baseCommands.push({
+				id: 'camera',
+				label: 'Take a photo',
+				description: 'Use the camera and attach the shot',
+				category: 'action',
+				icon: 'chat',
+				action: () => {
+					a.camera?.();
+					close();
+				}
+			});
+		}
+		if (a.changeRepo) {
+			baseCommands.push({
+				id: 'repo',
+				label: 'Change repository',
+				description: 'Point this conversation at another repo',
+				category: 'navigation',
+				icon: 'history',
+				action: () => {
+					a.changeRepo?.();
+					close();
+				}
+			});
+		}
 
 		// Add sessions as commands
 		const sessionCommands: Command[] = $allSessions.map((session) => ({
