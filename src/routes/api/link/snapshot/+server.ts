@@ -21,6 +21,18 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	if (body.length > 2_000_000) {
 		return json({ error: 'snapshot too large' }, { status: 413 });
 	}
+	/**
+	 * A count, whatever shape the field arrived in.
+	 *
+	 * `Number([{…}])` is NaN, which binds as NULL and trips a NOT NULL column —
+	 * which is exactly what happened the first time `attention` went from being
+	 * a count to being a list. The two halves of this system version
+	 * independently, so the reader has to survive a field changing shape
+	 * without failing the whole push.
+	 */
+	const count = (v: unknown): number =>
+		Array.isArray(v) ? v.length : Number.isFinite(Number(v)) ? Number(v) : 0;
+
 	let board: Record<string, unknown>;
 	try {
 		board = JSON.parse(body);
@@ -49,7 +61,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 				projects.length,
 				actors.length,
 				actors.filter((a) => a.state === 'working').length,
-				Number((board as { attention?: number }).attention ?? 0),
+				count(board.attention),
 				String((board as { autonomy?: string }).autonomy ?? 'unknown'),
 				(board as { gate_ok?: boolean }).gate_ok ? 1 : 0,
 				body
