@@ -8,9 +8,7 @@ export const load: PageLoad = async ({ fetch }) => {
 		return { board };
 	} catch (e) {
 		return {
-			board: emptyBoard(
-				`Could not read the board: ${e instanceof Error ? e.message : String(e)}`
-			)
+			board: emptyBoard(`Could not read the board: ${e instanceof Error ? e.message : String(e)}`)
 		};
 	}
 };

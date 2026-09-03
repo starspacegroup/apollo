@@ -57,7 +57,8 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		)
 			.bind(
 				String(board.machine ?? 'unknown'),
-				Math.floor(Date.parse(String(board.generated_at ?? '')) / 1000) || Math.floor(Date.now() / 1000),
+				Math.floor(Date.parse(String(board.generated_at ?? '')) / 1000) ||
+					Math.floor(Date.now() / 1000),
 				projects.length,
 				actors.length,
 				actors.filter((a) => a.state === 'working').length,

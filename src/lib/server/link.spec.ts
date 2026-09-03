@@ -26,7 +26,9 @@ describe('the link token', () => {
 	});
 
 	it('accepts the right one', () => {
-		expect(authorise(req('Bearer correct-horse'), { APOLLO_LINK_TOKEN: 'correct-horse' })).toBeNull();
+		expect(
+			authorise(req('Bearer correct-horse'), { APOLLO_LINK_TOKEN: 'correct-horse' })
+		).toBeNull();
 	});
 });
 

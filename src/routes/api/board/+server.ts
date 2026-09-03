@@ -29,8 +29,7 @@ export const GET: RequestHandler = async ({ platform }) => {
 		try {
 			const { readFile } = await import('node:fs/promises');
 			const { homedir } = await import('node:os');
-			const path =
-				process.env.APOLLO_SNAPSHOT ?? `${homedir()}/.local/share/apollo/board.json`;
+			const path = process.env.APOLLO_SNAPSHOT ?? `${homedir()}/.local/share/apollo/board.json`;
 			const text = await readFile(path, 'utf8');
 			return json(JSON.parse(text) as Board);
 		} catch (e) {

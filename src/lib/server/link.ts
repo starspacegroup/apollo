@@ -96,7 +96,15 @@ export async function createIntent(
 		)
 		.bind(id, kind, JSON.stringify(payload), now, createdBy)
 		.run();
-	return { id, kind, payload, created_at: now, created_by: createdBy, state: 'pending', detail: null };
+	return {
+		id,
+		kind,
+		payload,
+		created_at: now,
+		created_by: createdBy,
+		state: 'pending',
+		detail: null
+	};
 }
 
 /**
@@ -152,9 +160,7 @@ export async function settleIntent(
 	detail: string
 ): Promise<void> {
 	await db
-		.prepare(
-			`UPDATE intents SET state=?, settled_at=unixepoch(), detail=? WHERE id=?`
-		)
+		.prepare(`UPDATE intents SET state=?, settled_at=unixepoch(), detail=? WHERE id=?`)
 		.bind(ok ? 'applied' : 'refused', detail.slice(0, 500), id)
 		.run();
 }
