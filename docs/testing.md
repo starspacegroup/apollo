@@ -10,8 +10,9 @@ CI runs all three plus a production build, on every push and pull request.
 
 ## What the suites cover
 
-29 tests across eight files, in two vitest projects — a server project for
+40 tests across nine files, in two vitest projects — a server project for
 plain modules and a browser project (chromium, via playwright) for components.
+Nothing is skipped.
 
 | file                                | what it pins                                                                                     |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------ |
@@ -27,14 +28,31 @@ Several of these exist because the thing they pin was once a bug. The
 `tool_choice` assertion in particular is the reason tool calling stopped
 silently regressing — treat it as load-bearing.
 
+## The session store, and why it is tested against a real engine
+
+`lib/server/db.spec.ts` runs the real functions, with the real `schema.sql`,
+against a real SQLite database — `node:sqlite`, which ships with Node and is
+not a dependency. `lib/server/d1-memory.ts` is the thin adapter that gives it
+D1's interface: `prepare().bind().run()/all()/first()`, foreign keys on.
+
+It is written that way on purpose. A hand-written fake that matched query
+strings would pass whatever the queries happened to say, which is the same
+nothing that the file this replaced asserted — thirteen `it.skip` cases whose
+bodies were `expect(true).toBe(true)`, excused by a comment saying real tests
+"would need a test database".
+
+The load-bearing half is ownership. A session id must not be a capability, so
+every function that takes one also takes a `userId` and must refuse a session
+that is not that user's — read, append, retitle and delete alike, and a
+forbidden session must answer the same as a missing one so the API cannot be
+used to discover which ids exist. Deleting the predicate from `db.ts` fails
+these tests, which is the only evidence that they test anything.
+
 ## What is not covered
 
-**The session API endpoints.** `src/routes/api/sessions/api.test.ts` is thirteen
-`it.skip` cases whose bodies are `expect(true).toBe(true)`. It asserts nothing
-and never has. Making it real needs a D1 test binding and mocked
-authentication; until someone does that, the file is a note about missing
-coverage rather than coverage, and reading a green suite as "the session API
-works" is wrong.
+**The HTTP layer.** The tests exercise `db.ts`, which is where the ownership
+checks live. The endpoints in `routes/api/sessions/` do their own `locals.auth()`
+check before calling it; that check is not tested.
 
 **The relay end to end.** Nothing exercises browser → Worker → OpenAI. The
 config is tested; the socket is not.
