@@ -7,7 +7,7 @@
  * because two hand-written definitions drift. Until then `schema` is the guard:
  * the page checks it and says so rather than rendering a shape it half knows.
  */
-export const SCHEMA = 2;
+export const SCHEMA = 3;
 
 export interface Meters {
 	five_hour: number;
@@ -22,6 +22,55 @@ export interface Meters {
 }
 
 export type Lane = 'needs_you' | 'unpushed' | 'quiet';
+
+/**
+ * Which pile a pull request is in, chosen by what has to happen NEXT for it to
+ * land. The local half takes this from dirac's pr-watch and does not re-sort
+ * it: two surfaces that order the same list differently disagree about what
+ * matters most, in public.
+ */
+export type PrBucket =
+	| 'ready'
+	| 'waiting_on_you'
+	| 'checks_red'
+	| 'conflicts'
+	| 'changes_requested'
+	| 'draft'
+	| 'stale';
+
+export interface PrCard {
+	key: string;
+	repo: string;
+	number: number;
+	title: string;
+	url: string;
+	author: string;
+	bucket: PrBucket;
+	/** Ordering, not a unit. Do not render it. */
+	score: number;
+	merge_state: string;
+	review: string;
+	adds: number;
+	dels: number;
+	age_days: number;
+	idle_days: number;
+}
+
+/**
+ * Every open pull request across David's account and organisations, as of the
+ * last pr-watch pass. It carries its own age because it is a snapshot at most
+ * six hours old, and a snapshot that does not say so reads like a live number.
+ */
+export interface Prs {
+	generated_at: string;
+	age_minutes: number;
+	stale: boolean;
+	/** `open`, plus one entry per bucket. */
+	counts: Record<string, number>;
+	/** Scopes that could not be searched on that pass; their PRs are missing. */
+	unsearchable_scopes: string[];
+	cards: PrCard[];
+}
 
 export interface Project {
 	name: string;
@@ -117,6 +166,8 @@ export interface Board {
 	index_age_seconds: number;
 	meters: Meters | null;
 	projects: Project[];
+	/** Null when dirac's pr-watch has never written a board on that machine. */
+	pull_requests: Prs | null;
 	actors: Actor[];
 	characters: Character[];
 	reconciled: Reconciled;
@@ -138,6 +189,7 @@ export function emptyBoard(reason: string): Board {
 		index_age_seconds: -1,
 		meters: null,
 		projects: [],
+		pull_requests: null,
 		actors: [],
 		characters: [],
 		reconciled: { local: 0, remote: 0, matched: 0, ghosts: 0, orphans: 0, ambiguous: 0 },

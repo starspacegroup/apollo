@@ -8,6 +8,7 @@
 		SCHEMA,
 		type Actor,
 		type AskedFor,
+		type PrCard,
 		type Project
 	} from '$lib/board';
 
@@ -52,6 +53,36 @@
 	let selected: Card | null = $state(null);
 
 	const meters = $derived(board.meters);
+
+	/* ── open pull requests ───────────────────────────────────────────────────
+	 *
+	 * Two piles only, because a phone screen is not a triage tool: what David
+	 * can move himself, and what is stuck on someone else. Drafts and the
+	 * decade-old stale ones are counted, never listed — a board that shows a
+	 * 2015 Gitter-badge PR every time teaches you to scroll past the section.
+	 *
+	 * The order is the one the local half sent. Re-sorting here is how two
+	 * surfaces come to disagree about which pull request matters most.
+	 */
+	const prs = $derived(board.pull_requests);
+	const prMine = $derived(
+		(prs?.cards ?? []).filter(
+			(c: PrCard) => c.bucket === 'ready' || c.bucket === 'waiting_on_you'
+		)
+	);
+	const prStuck = $derived(
+		(prs?.cards ?? []).filter(
+			(c: PrCard) =>
+				c.bucket === 'checks_red' || c.bucket === 'conflicts' || c.bucket === 'changes_requested'
+		)
+	);
+	const prWhy: Record<string, string> = {
+		ready: 'ready',
+		waiting_on_you: 'your review',
+		checks_red: 'CI failing',
+		conflicts: 'conflicts',
+		changes_requested: 'changes requested'
+	};
 
 	/* ── the write half ──────────────────────────────────────────────────────
 	 *
@@ -221,6 +252,56 @@
 					>
 				</div>
 			{/each}
+		</section>
+	{/if}
+
+	{#if prs}
+		<section class="prs">
+			<h2>
+				Open pull requests<span class="count">{prs.counts.open ?? 0}</span>
+				<span class="age">{ago(prs.generated_at)}</span>
+			</h2>
+
+			{#if prs.stale}
+				<p class="warn-line">
+					This is {ago(prs.generated_at)} — pr-watch runs every six hours, so it has missed a
+					pass.
+				</p>
+			{/if}
+			{#if prs.unsearchable_scopes.length > 0}
+				<p class="warn-line">
+					{prs.unsearchable_scopes.join(', ')} could not be searched on that pass; anything open there
+					is missing from this list.
+				</p>
+			{/if}
+
+			{#if prMine.length === 0 && prStuck.length === 0}
+				<p class="none">Nothing open that needs a person.</p>
+			{/if}
+
+			{#each prMine as c (c.key)}
+				<a class="pr yours" href={c.url} target="_blank" rel="noreferrer">
+					<span class="w">{prWhy[c.bucket] ?? c.bucket}</span>
+					<span class="t">{c.title}</span>
+					<span class="m"
+						>{c.repo}#{c.number} · {c.author} · {c.age_days}d{#if c.review === 'APPROVED'}
+							· approved{/if}</span
+					>
+				</a>
+			{/each}
+			{#each prStuck as c (c.key)}
+				<a class="pr stuck" href={c.url} target="_blank" rel="noreferrer">
+					<span class="w">{prWhy[c.bucket] ?? c.bucket}</span>
+					<span class="t">{c.title}</span>
+					<span class="m">{c.repo}#{c.number} · {c.author} · {c.age_days}d</span>
+				</a>
+			{/each}
+
+			{#if (prs.counts.draft ?? 0) + (prs.counts.stale ?? 0) > 0}
+				<p class="none">
+					Also {prs.counts.draft ?? 0} draft and {prs.counts.stale ?? 0} untouched for 90 days — not listed.
+				</p>
+			{/if}
 		</section>
 	{/if}
 
@@ -787,12 +868,14 @@
 		border-color: rgba(255, 177, 78, 0.5);
 	}
 
+	.prs,
 	.attention,
 	.asked,
 	.decisions {
 		padding: 0.8rem var(--pad);
 		border-bottom: 1px solid var(--rule);
 	}
+	.prs h2,
 	.attention h2,
 	.asked h2,
 	.decisions h2 {
@@ -844,6 +927,64 @@
 	}
 	.attention .seen:hover:not(:disabled) {
 		color: var(--cyan);
+	}
+
+	.prs h2 .age {
+		margin-left: 0.5rem;
+		font-weight: 400;
+		letter-spacing: 0;
+		text-transform: none;
+		color: var(--faint);
+	}
+	.prs .warn-line {
+		margin: 0 0 0.4rem;
+		font-size: var(--t-xs);
+		color: var(--amber);
+	}
+	.prs .none {
+		margin: 0.35rem 0 0;
+		font-size: var(--t-xs);
+		color: var(--faint);
+	}
+	.pr {
+		display: grid;
+		grid-template-columns: 7.5rem 1fr;
+		gap: 0.15rem 0.6rem;
+		padding: 0.45rem 0;
+		border-top: 1px solid var(--rule);
+		font-size: var(--t-sm);
+		text-decoration: none;
+		color: inherit;
+	}
+	.pr:hover .t {
+		color: var(--cyan);
+	}
+	.pr .w {
+		grid-row: span 2;
+		font-family: var(--mono);
+		font-size: var(--t-xs);
+		text-transform: uppercase;
+		color: var(--amber);
+	}
+	.pr.stuck .w {
+		color: var(--red);
+	}
+	.pr .t {
+		color: var(--bright);
+		font-weight: 600;
+	}
+	.pr .m {
+		font-size: var(--t-xs);
+		color: var(--dim);
+	}
+	/* One column on a phone: a 7.5rem label beside a title leaves no title. */
+	@media (max-width: 30rem) {
+		.pr {
+			grid-template-columns: 1fr;
+		}
+		.pr .w {
+			grid-row: auto;
+		}
 	}
 
 	.asked .row,
