@@ -6,6 +6,7 @@
 		projectSummary,
 		shortModel,
 		SCHEMA,
+		brandOf,
 		type Actor,
 		type AskedFor,
 		type PrCard,
@@ -73,6 +74,13 @@
 			(c: PrCard) =>
 				c.bucket === 'checks_red' || c.bucket === 'conflicts' || c.bucket === 'changes_requested'
 		)
+	);
+	/* Open on a wide screen, folded on a phone. Fourteen rows of pull requests
+	 * above the lanes put the board itself two screens down on a phone; the
+	 * summary line still says how many you can move and how many are stuck,
+	 * which is the part that has to be visible without a tap. */
+	let prsOpen = $state(
+		typeof window !== 'undefined' && window.matchMedia('(min-width: 62rem)').matches
 	);
 	const prWhy: Record<string, string> = {
 		ready: 'ready',
@@ -151,6 +159,19 @@
 
 	function title(c: Card): string {
 		return c.kind === 'actor' ? c.actor.name : c.project.name;
+	}
+
+	/* A session card wears the mark of the project it is sitting in. The
+	 * actor carries only its home path; the project row for that path carries
+	 * the logo, so the join happens here rather than twice in the snapshot. */
+	function brand(c: Card): { logo: string | null; color: string | null } {
+		if (c.kind === 'project') return brandOf(c.project);
+		return brandOf(board.projects.find((p) => p.path === c.actor.home));
+	}
+
+	function brandStyle(c: Card): string | undefined {
+		const b = brand(c);
+		return b.color ? `--brand: ${b.color}` : undefined;
 	}
 
 	function sub(c: Card): string {
@@ -254,11 +275,17 @@
 	{/if}
 
 	{#if prs}
-		<section class="prs">
-			<h2>
-				Open pull requests<span class="count">{prs.counts.open ?? 0}</span>
-				<span class="age">{ago(prs.generated_at)}</span>
-			</h2>
+		<details class="prs" bind:open={prsOpen}>
+			<summary>
+				<h2>
+					Open pull requests<span class="count">{prs.counts.open ?? 0}</span>
+					<span class="age">{ago(prs.generated_at)}</span>
+				</h2>
+				<span class="piles-line">
+					<b class:some={prMine.length > 0}>{prMine.length}</b> you can move ·
+					<b class:stuck={prStuck.length > 0}>{prStuck.length}</b> stuck
+				</span>
+			</summary>
 
 			{#if prs.stale}
 				<p class="warn-line">
@@ -276,23 +303,29 @@
 				<p class="none">Nothing open that needs a person.</p>
 			{/if}
 
-			{#each prMine as c (c.key)}
-				<a class="pr yours" href={c.url} target="_blank" rel="noreferrer">
-					<span class="w">{prWhy[c.bucket] ?? c.bucket}</span>
-					<span class="t">{c.title}</span>
-					<span class="m"
-						>{c.repo}#{c.number} · {c.author} · {c.age_days}d{#if c.review === 'APPROVED'}
-							· approved{/if}</span
-					>
-				</a>
-			{/each}
-			{#each prStuck as c (c.key)}
-				<a class="pr stuck" href={c.url} target="_blank" rel="noreferrer">
-					<span class="w">{prWhy[c.bucket] ?? c.bucket}</span>
-					<span class="t">{c.title}</span>
-					<span class="m">{c.repo}#{c.number} · {c.author} · {c.age_days}d</span>
-				</a>
-			{/each}
+			<div class="piles">
+				<div class="pile">
+					{#each prMine as c (c.key)}
+						<a class="pr yours" href={c.url} target="_blank" rel="noreferrer">
+							<span class="w">{prWhy[c.bucket] ?? c.bucket}</span>
+							<span class="t">{c.title}</span>
+							<span class="m"
+								>{c.repo}#{c.number} · {c.author} · {c.age_days}d{#if c.review === 'APPROVED'}
+									· approved{/if}</span
+							>
+						</a>
+					{/each}
+				</div>
+				<div class="pile">
+					{#each prStuck as c (c.key)}
+						<a class="pr stuck" href={c.url} target="_blank" rel="noreferrer">
+							<span class="w">{prWhy[c.bucket] ?? c.bucket}</span>
+							<span class="t">{c.title}</span>
+							<span class="m">{c.repo}#{c.number} · {c.author} · {c.age_days}d</span>
+						</a>
+					{/each}
+				</div>
+			</div>
 
 			{#if (prs.counts.draft ?? 0) + (prs.counts.stale ?? 0) > 0}
 				<p class="none">
@@ -300,7 +333,7 @@
 					listed.
 				</p>
 			{/if}
-		</section>
+		</details>
 	{/if}
 
 	{#if board.schema !== SCHEMA}
@@ -324,16 +357,28 @@
 				<h2>{lane.title}<span class="count">{lane.cards.length}</span></h2>
 				<div class="cards">
 					{#each lane.cards as card}
+						{@const b = brand(card)}
 						<button
 							class="card {accent(card)}"
 							class:selected={selected === card}
+							class:branded={!!b.color}
+							style={brandStyle(card)}
 							onclick={() => (selected = selected === card ? null : card)}
 						>
-							<span class="t">{title(card)}</span>
-							<span class="s">{sub(card)}</span>
-							{#if card.kind === 'actor' && card.actor.doing}
-								<span class="doing">{card.actor.doing}</span>
-							{/if}
+							<span class="face">
+								{#if b.logo}
+									<img src={b.logo} alt="" />
+								{:else}
+									<span class="initial">{title(card).slice(0, 1)}</span>
+								{/if}
+							</span>
+							<span class="text">
+								<span class="t">{title(card)}</span>
+								<span class="s">{sub(card)}</span>
+								{#if card.kind === 'actor' && card.actor.doing}
+									<span class="doing">{card.actor.doing}</span>
+								{/if}
+							</span>
 						</button>
 					{:else}
 						<p class="empty">nothing here</p>
@@ -344,8 +389,20 @@
 
 		<aside class="detail" class:open={selected !== null}>
 			{#if selected}
-				<h3>{title(selected)}</h3>
-				<p class="sub">{sub(selected)}</p>
+				{@const b = brand(selected)}
+				<div class="head" class:branded={!!b.color} style={brandStyle(selected)}>
+					<span class="face large">
+						{#if b.logo}
+							<img src={b.logo} alt="" />
+						{:else}
+							<span class="initial">{title(selected).slice(0, 1)}</span>
+						{/if}
+					</span>
+					<div>
+						<h3>{title(selected)}</h3>
+						<p class="sub">{sub(selected)}</p>
+					</div>
+				</div>
 				<dl>
 					{#each detail(selected) as [k, v]}
 						<dt>{k}</dt>
@@ -621,19 +678,78 @@
 
 	.card {
 		display: flex;
-		flex-direction: column;
-		gap: 0.2rem;
+		align-items: center;
+		gap: 0.65rem;
 		text-align: left;
 		background: linear-gradient(170deg, var(--panel), #080d18);
 		border: 1px solid var(--rule);
 		border-left: 0.2rem solid var(--dim);
 		border-radius: 0.65rem;
-		padding: 0.65rem 0.8rem;
+		padding: 0.6rem 0.8rem 0.6rem 0.65rem;
 		cursor: pointer;
 		font: inherit;
+		color: inherit;
+	}
+	.card .text {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+		min-width: 0;
 	}
 	.card.selected {
 		border-color: rgba(89, 217, 255, 0.55);
+	}
+
+	/* ── the project's own face ──────────────────────────────────────────────
+	 *
+	 * The mark the StreamDeck shows for this project, at the size of a favicon,
+	 * and its colour as a tint: a few percent into the card's ground and a
+	 * little more behind the mark. Subtle on purpose — the left edge already
+	 * says what STATE a card is in, and that must stay the loudest colour on it.
+	 * A project with no mark gets its initial on the same well, so the column
+	 * lines up whether or not a logo was ever drawn. */
+	.face {
+		--tint: var(--brand, #64748b);
+		width: 2.1rem;
+		height: 2.1rem;
+		flex: 0 0 auto;
+		border-radius: 0.55rem;
+		display: grid;
+		place-items: center;
+		overflow: hidden;
+		background: color-mix(in srgb, var(--tint) 14%, transparent);
+		border: 1px solid color-mix(in srgb, var(--tint) 28%, transparent);
+	}
+	.face img {
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
+		padding: 0.22rem;
+		box-sizing: border-box;
+	}
+	.face .initial {
+		font-weight: 700;
+		font-size: var(--t-sm);
+		color: color-mix(in srgb, var(--tint) 80%, white);
+	}
+	.face.large {
+		width: 3rem;
+		height: 3rem;
+		border-radius: 0.75rem;
+	}
+	.face.large .initial {
+		font-size: var(--t-lg);
+	}
+	.card.branded {
+		background: linear-gradient(
+			100deg,
+			color-mix(in srgb, var(--brand) 9%, var(--panel)) 0%,
+			var(--panel) 40%,
+			#080d18 100%
+		);
+	}
+	.card.branded:hover {
+		border-color: color-mix(in srgb, var(--brand) 35%, var(--rule));
 	}
 	.card.green {
 		border-left-color: var(--green);
@@ -687,13 +803,23 @@
 	.detail.open {
 		transform: translateY(0);
 	}
+	.detail .head {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		margin-bottom: 0.7rem;
+	}
+	.detail .head > div {
+		min-width: 0;
+	}
 	.detail h3 {
 		margin: 0;
 		color: var(--bright);
 		font-size: var(--t-lg);
+		overflow-wrap: anywhere;
 	}
 	.detail .sub {
-		margin: 0.2rem 0 0.7rem;
+		margin: 0.2rem 0 0;
 		font-family: var(--mono);
 		font-size: var(--t-xs);
 		color: var(--faint);
@@ -933,6 +1059,64 @@
 		letter-spacing: 0;
 		text-transform: none;
 		color: var(--faint);
+	}
+	/* The section folds. The summary is the part that must read without a tap:
+	   the two counts, coloured only when they are not zero. */
+	.prs summary {
+		list-style: none;
+		cursor: pointer;
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.2rem 0.9rem;
+		min-height: 2.2rem;
+	}
+	.prs summary::-webkit-details-marker {
+		display: none;
+	}
+	.prs summary h2 {
+		margin: 0;
+	}
+	.prs summary h2::before {
+		content: '▸';
+		display: inline-block;
+		width: 1rem;
+		color: var(--faint);
+		transition: transform 0.15s ease;
+	}
+	.prs[open] summary h2::before {
+		transform: rotate(90deg);
+	}
+	.prs .piles-line {
+		font-family: var(--mono);
+		font-size: var(--t-xs);
+		color: var(--faint);
+	}
+	.prs .piles-line b {
+		font-weight: 600;
+		color: var(--dim);
+	}
+	.prs .piles-line b.some {
+		color: var(--amber);
+	}
+	.prs .piles-line b.stuck {
+		color: var(--red);
+	}
+	.prs .piles {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 0 1.5rem;
+		margin-top: 0.4rem;
+	}
+	.prs .pile:empty {
+		display: none;
+	}
+	/* Side by side once there is room: what you can move, what is stuck. */
+	@media (min-width: 62rem) {
+		.prs .piles {
+			grid-template-columns: 1fr 1fr;
+			align-items: start;
+		}
 	}
 	.prs .warn-line {
 		margin: 0 0 0.4rem;

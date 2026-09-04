@@ -592,4 +592,20 @@
 			gap: 0.5rem;
 		}
 	}
+
+	/* On a phone the badge was eating the description: "Realtime voice — speak
+	   and be…" beside a box that says ACTION. The label already says what the
+	   row is. */
+	@media (max-width: 30rem) {
+		.command-badge {
+			display: none;
+		}
+	}
+
+	/* ↑↓ and Enter are not on a touchscreen. */
+	@media (hover: none) and (pointer: coarse) {
+		.command-palette-footer {
+			display: none;
+		}
+	}
 </style>

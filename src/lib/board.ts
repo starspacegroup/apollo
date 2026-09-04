@@ -7,7 +7,7 @@
  * because two hand-written definitions drift. Until then `schema` is the guard:
  * the page checks it and says so rather than rendering a shape it half knows.
  */
-export const SCHEMA = 3;
+export const SCHEMA = 4;
 
 export interface Meters {
 	five_hour: number;
@@ -86,6 +86,14 @@ export interface Project {
 	sessions: number;
 	error: string | null;
 	lane: Lane;
+	/**
+	 * The project's own mark, inline as a `data:` URI — found on the machine
+	 * where the StreamDeck finds it, so a tile there and a card here wear the
+	 * same file. Null when the project has none.
+	 */
+	logo: string | null;
+	/** `#rrggbb`, read out of the mark. A tint, never a palette. */
+	color: string | null;
 }
 
 export interface Actor {
@@ -245,4 +253,22 @@ export function projectSummary(p: Project): string {
 	if (p.behind > 0) bits.push(`↓${p.behind} behind`);
 	if (bits.length === 0) return p.branch ?? 'clean';
 	return bits.join(' · ');
+}
+
+/**
+ * The two brand fields, checked before they touch the DOM. The snapshot is
+ * trusted enough to render, not enough to write an arbitrary `style` from: a
+ * colour is six hex digits and a logo is an image `data:` URI, or nothing.
+ */
+export function brandOf(p: Pick<Project, 'logo' | 'color'> | null | undefined): {
+	logo: string | null;
+	color: string | null;
+} {
+	if (!p) return { logo: null, color: null };
+	const color = p.color && /^#[0-9a-f]{6}$/i.test(p.color) ? p.color.toLowerCase() : null;
+	const logo =
+		p.logo && /^data:image\/(svg\+xml|png|webp);base64,[A-Za-z0-9+/=]+$/.test(p.logo)
+			? p.logo
+			: null;
+	return { logo, color };
 }

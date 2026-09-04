@@ -766,4 +766,16 @@
 		color: var(--modal-link-hover);
 		text-decoration: underline;
 	}
+
+	/* A phone. The heading was wrapping onto two lines at 1.75rem and the
+	   padding was a third of the width. */
+	@media (max-width: 30rem) {
+		.modal-content {
+			padding: 1.25rem;
+			border-radius: 0.85rem;
+		}
+		h2 {
+			font-size: 1.35rem;
+		}
+	}
 </style>
