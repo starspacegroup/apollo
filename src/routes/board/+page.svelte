@@ -66,9 +66,7 @@
 	 */
 	const prs = $derived(board.pull_requests);
 	const prMine = $derived(
-		(prs?.cards ?? []).filter(
-			(c: PrCard) => c.bucket === 'ready' || c.bucket === 'waiting_on_you'
-		)
+		(prs?.cards ?? []).filter((c: PrCard) => c.bucket === 'ready' || c.bucket === 'waiting_on_you')
 	);
 	const prStuck = $derived(
 		(prs?.cards ?? []).filter(
@@ -264,8 +262,7 @@
 
 			{#if prs.stale}
 				<p class="warn-line">
-					This is {ago(prs.generated_at)} — pr-watch runs every six hours, so it has missed a
-					pass.
+					This is {ago(prs.generated_at)} — pr-watch runs every six hours, so it has missed a pass.
 				</p>
 			{/if}
 			{#if prs.unsearchable_scopes.length > 0}
@@ -299,7 +296,8 @@
 
 			{#if (prs.counts.draft ?? 0) + (prs.counts.stale ?? 0) > 0}
 				<p class="none">
-					Also {prs.counts.draft ?? 0} draft and {prs.counts.stale ?? 0} untouched for 90 days — not listed.
+					Also {prs.counts.draft ?? 0} draft and {prs.counts.stale ?? 0} untouched for 90 days — not
+					listed.
 				</p>
 			{/if}
 		</section>
