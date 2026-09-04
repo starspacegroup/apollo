@@ -4,6 +4,7 @@
 	import LiveChat from '$lib/LiveChat.svelte';
 	import { repoStore } from '$lib/stores/repoStore';
 	import { sessionStore, currentSession } from '$lib/stores/sessionStore';
+	import { paletteOpen } from '$lib/stores/palette';
 	import { signIn } from '@auth/sveltekit/client';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
@@ -15,6 +16,11 @@
 	// Clear current session when on root page to ensure fresh chat
 	onMount(() => {
 		sessionStore.clearCurrentSession();
+		// The palette is the front door. Arriving at the root means "I am here to
+		// start something", and the first question is which thing — not a cursor
+		// blinking in an empty box. ⌘K reopens it, Escape puts it away, and
+		// resuming a conversation at /c/[id] does not open it at all.
+		if (session) paletteOpen.set(true);
 	});
 
 	function changeRepo() {

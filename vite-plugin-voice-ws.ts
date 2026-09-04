@@ -86,7 +86,7 @@ function setupOpenAIConnection(clientWs: WebSocket, OPENAI_API_KEY: string, repo
 
 		// Load GitHub Issue context
 		const githubIssueContext = readFileSync(
-			join(process.cwd(), 'GITHUB_ISSUE_CHATBOT.md'),
+			join(process.cwd(), 'prompts', 'issue-context.md'),
 			'utf-8'
 		);
 

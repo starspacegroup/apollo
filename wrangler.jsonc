@@ -27,6 +27,25 @@
 			"database_name": "apollo-sessions",
 			"database_id": "preview-database-id"
 		}
+	],
+	/**
+	 * The board snapshot the local half pushes.
+	 *
+	 * KV rather than D1 for this one read because it is the hot path and the
+	 * value is one blob that is always read whole — plans/state-layer.md §5.5.
+	 * D1 keeps the trail; KV answers "what is happening right now" without a
+	 * query. Create it with:
+	 *
+	 *   wrangler kv namespace create APOLLO_SNAPSHOT
+	 *
+	 * and paste the id here. Until then the binding is absent and the board says
+	 * so rather than showing a demo.
+	 */
+	"kv_namespaces": [
+		{
+			"binding": "APOLLO_SNAPSHOT",
+			"id": "replace-with-a-real-namespace-id"
+		}
 	]
 	/**
 	 * Smart Placement

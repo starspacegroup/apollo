@@ -1,4 +1,8 @@
-export const OPENAI_REALTIME_MODEL = 'gpt-4o-mini-realtime-preview';
+// The model id and its input capabilities live in `$lib/realtimeModel`, so the
+// composer can read them too without importing a server module. Re-exported
+// here because this file's callers and its test have always asked for it.
+export { OPENAI_REALTIME_MODEL, modelSeesImages } from '../realtimeModel';
+import { OPENAI_REALTIME_MODEL } from '../realtimeModel';
 
 export function openAIRealtimeUrl(): string {
 	const url = new URL('wss://api.openai.com/v1/realtime');

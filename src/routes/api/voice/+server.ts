@@ -1,8 +1,8 @@
 import type { RequestHandler } from './$types';
 // @ts-ignore - Vite raw import
-import githubIssueContext from '../../../../GITHUB_ISSUE_CHATBOT.md?raw';
+import githubIssueContext from '../../../../prompts/issue-context.md?raw';
 // @ts-ignore - Vite raw import
-import githubAssistantInstructions from '../../../../GITHUB_ASSISTANT_INSTRUCTIONS.md?raw';
+import githubAssistantInstructions from '../../../../prompts/assistant-instructions.md?raw';
 import {
 	getRepositorySummary,
 	listGitHubIssues,
