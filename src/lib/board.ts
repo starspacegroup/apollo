@@ -210,6 +210,8 @@ export interface Switches {
 		autonomy: string | null;
 		off: string[];
 		merge: string | null;
+		/** The project's own team, when it names one. Absent on older snapshots. */
+		team?: string[];
 	}[];
 	characters: { handle: string; autonomy: string | null; off: string[] }[];
 }

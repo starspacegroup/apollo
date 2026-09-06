@@ -321,7 +321,9 @@
 							{#if p.off.length > 0}
 								· off: {p.off.join(', ')}{/if}
 							{#if p.merge}
-								· merge {p.merge}{/if}</span
+								· merge {p.merge}{/if}
+							{#if p.team && p.team.length > 0}
+								· team: {p.team.join(', ')}{/if}</span
 						>
 					{/each}
 					{#each board.switches.characters as c (c.handle)}
