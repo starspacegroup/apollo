@@ -16,7 +16,7 @@ The umbrella repository's `README.md` explains where this sits in the whole.
 ## Quick start
 
 ```sh
-cp .env.example .env      # fill in the four secrets it names
+cp .env.example .env      # fill in the secrets it names
 npm install
 npm run dev               # http://localhost:8787
 ```

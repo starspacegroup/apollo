@@ -1,6 +1,6 @@
 # Setup
 
-Four secrets, one database, one KV namespace. Nothing here is optional in
+Five secrets, one database, one KV namespace. Nothing here is optional in
 production, but the app degrades in a stated way when a piece is missing, so
 you can set them up one at a time.
 
@@ -21,9 +21,8 @@ absent. `src/auth.ts` says so at the top; do not change it back.
 
 `AUTH_SECRET` wants 32 random bytes: `openssl rand -base64 32`.
 
-`APOLLO_LINK_TOKEN` is the one that is easy to miss — it appears in no example
-file until you add it, and nothing about a missing snapshot points at it. The
-same value must be set on the daemon side. A Worker with no token configured
+`APOLLO_LINK_TOKEN` is the one that is easy to miss — nothing about a missing
+snapshot points at it. The same value must be set on the daemon side. A Worker with no token configured
 refuses everything, on purpose: an unset secret must not read as "no
 authentication required".
 

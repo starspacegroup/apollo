@@ -10,7 +10,7 @@ CI runs all three plus a production build, on every push and pull request.
 
 ## What the suites cover
 
-40 tests across nine files, in two vitest projects — a server project for
+39 tests across eight files, in two vitest projects — a server project for
 plain modules and a browser project (chromium, via playwright) for components.
 Nothing is skipped.
 
