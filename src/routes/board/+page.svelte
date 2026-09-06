@@ -75,6 +75,16 @@
 				c.bucket === 'checks_red' || c.bucket === 'conflicts' || c.bucket === 'changes_requested'
 		)
 	);
+	/* What the fleet said about a card, and a person's standing order on it,
+	 * both keyed by the card. A verdict is a run that read the diff; the bucket
+	 * is the checks. They answer different questions and both are shown. */
+	const prVerdict = $derived(new Map((prs?.verdicts ?? []).map((v) => [v.key, v])));
+	const prOrder = $derived(new Map((prs?.orders ?? []).map((o) => [o.key, o])));
+	const verdictWord: Record<string, string> = {
+		good: 'good',
+		'needs-work': 'needs work',
+		bad: 'bad'
+	};
 	/* Open on a wide screen, folded on a phone. Fourteen rows of pull requests
 	 * above the lanes put the board itself two screens down on a phone; the
 	 * summary line still says how many you can move and how many are stuck,
@@ -313,6 +323,15 @@
 								>{c.repo}#{c.number} · {c.author} · {c.age_days}d{#if c.review === 'APPROVED'}
 									· approved{/if}</span
 							>
+							{#if prVerdict.get(c.key)}
+								{@const v = prVerdict.get(c.key)!}
+								<span class="v {v.word}" title={v.summary}
+									>{verdictWord[v.word] ?? v.word} · {v.by}</span
+								>
+							{/if}
+							{#if prOrder.get(c.key)}
+								<span class="v order">merges when green · {prOrder.get(c.key)!.how}</span>
+							{/if}
 						</a>
 					{/each}
 				</div>
@@ -322,6 +341,15 @@
 							<span class="w">{prWhy[c.bucket] ?? c.bucket}</span>
 							<span class="t">{c.title}</span>
 							<span class="m">{c.repo}#{c.number} · {c.author} · {c.age_days}d</span>
+							{#if prVerdict.get(c.key)}
+								{@const v = prVerdict.get(c.key)!}
+								<span class="v {v.word}" title={v.summary}
+									>{verdictWord[v.word] ?? v.word} · {v.by}</span
+								>
+							{/if}
+							{#if prOrder.get(c.key)}
+								<span class="v order">merges when green · {prOrder.get(c.key)!.how}</span>
+							{/if}
 						</a>
 					{/each}
 				</div>
@@ -1158,6 +1186,27 @@
 	.pr .m {
 		font-size: var(--t-xs);
 		color: var(--dim);
+	}
+	/* What read the diff said, and a standing order. Second column, under
+	 * the meta line, so the bucket word on the left stays the loudest thing. */
+	.pr .v {
+		grid-column: 2;
+		font-family: var(--mono);
+		font-size: var(--t-xs);
+		letter-spacing: 0.04em;
+		color: var(--faint);
+	}
+	.pr .v.good {
+		color: var(--green);
+	}
+	.pr .v.needs-work {
+		color: var(--amber);
+	}
+	.pr .v.bad {
+		color: var(--red);
+	}
+	.pr .v.order {
+		color: var(--cyan, var(--dim));
 	}
 	/* One column on a phone: a 7.5rem label beside a title leaves no title. */
 	@media (max-width: 30rem) {

@@ -57,6 +57,29 @@ export interface PrCard {
 }
 
 /**
+ * What a run that read the diff concluded — `good`, `needs-work` or `bad` —
+ * kept apart from the mechanical bucket, because "ready" from the checks and
+ * "good" from a reader answer different questions. Keyed by the card's `key`.
+ * Absent on a snapshot from a local half that predates 2026-09-05.
+ */
+export interface PrVerdict {
+	key: string;
+	word: 'good' | 'needs-work' | 'bad';
+	summary: string;
+	by: string;
+	at: string;
+	posted: boolean;
+}
+
+/** A person's standing order: merge this one, this way, the tick it is green. */
+export interface PrOrder {
+	key: string;
+	how: string;
+	by: string;
+	at: string | null;
+}
+
+/**
  * Every open pull request across David's account and organisations, as of the
  * last pr-watch pass. It carries its own age because it is a snapshot at most
  * six hours old, and a snapshot that does not say so reads like a live number.
@@ -70,6 +93,10 @@ export interface Prs {
 	/** Scopes that could not be searched on that pass; their PRs are missing. */
 	unsearchable_scopes: string[];
 	cards: PrCard[];
+	/** The fleet's verdicts, where a run has read a diff. Optional: older snapshots lack it. */
+	verdicts?: PrVerdict[];
+	/** Standing merge orders a person set. Optional, as above. */
+	orders?: PrOrder[];
 }
 
 export interface Project {
