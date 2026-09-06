@@ -194,6 +194,26 @@ export interface AskedFor {
 	detail: string | null;
 }
 
+/**
+ * The switchboard: what is off for the fleet, and every project and character
+ * carrying an override. Absent on a snapshot from a local half that predates
+ * 2026-09-06. A phone may switch a capability off, pause a project, or lower
+ * the dial — never the reverse; the local half refuses it by name.
+ */
+export interface Switches {
+	off: string[];
+	/** Every capability there is, as `[name, what it gates]`. */
+	capabilities: [string, string][];
+	projects: {
+		name: string;
+		focus: string;
+		autonomy: string | null;
+		off: string[];
+		merge: string | null;
+	}[];
+	characters: { handle: string; autonomy: string | null; off: string[] }[];
+}
+
 export interface Board {
 	schema: number;
 	generated_at: string;
@@ -208,6 +228,7 @@ export interface Board {
 	reconciled: Reconciled;
 	autonomy: 'off' | 'propose' | 'supervised' | 'autonomous';
 	paused_until: string | null;
+	switches?: Switches;
 	gate_ok: boolean;
 	gate_detail: string;
 	attention: Attend[];

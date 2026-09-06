@@ -157,6 +157,12 @@
 	});
 
 	const canStart = $derived(board.autonomy === 'supervised' || board.autonomy === 'autonomous');
+	/* The levels below the current one, highest first: the phone may lower
+	 * the dial and never raise it, so these are the only buttons it gets. */
+	const dialOrder = ['off', 'propose', 'supervised', 'autonomous'] as const;
+	const lowerTo = $derived(
+		dialOrder.slice(0, Math.max(0, dialOrder.indexOf(board.autonomy))).reverse()
+	);
 	const paused = $derived(!!board.paused_until && Date.parse(board.paused_until) > Date.now());
 
 	function accent(c: Card): string {
@@ -263,8 +269,74 @@
 					pause 2h
 				</button>
 			{/if}
+			<!-- The dial can only come down from here. Each button is one step
+			     below the current setting; the local half refuses anything else. -->
+			{#each lowerTo as level}
+				<button
+					class="chip act"
+					disabled={asking}
+					title="lower the dial to {level} — only the machine can raise it again"
+					onclick={() => ask('autonomy.lower', { level })}
+				>
+					lower to {level}
+				</button>
+			{/each}
 		</div>
 	</header>
+
+	{#if board.switches}
+		<!-- The switchboard, in the one direction a phone may turn it. A switch
+		     that is on can be turned off from here; turning one back on is the
+		     machine's alone, so an off switch shows as off and offers nothing. -->
+		<section class="switches">
+			<h2>The fleet may</h2>
+			<div class="caps">
+				{#each board.switches.capabilities as [name, what] (name)}
+					{@const off = board.switches.off.includes(name)}
+					<div class="cap" class:off title={what}>
+						<span class="n">{name}</span>
+						{#if off}
+							<span class="s">off · on again only at the machine</span>
+						{:else}
+							<button
+								class="chip act"
+								disabled={asking}
+								onclick={() => ask('switch.off', { capability: name })}
+							>
+								switch off
+							</button>
+						{/if}
+					</div>
+				{/each}
+			</div>
+			{#if board.switches.projects.length > 0 || board.switches.characters.length > 0}
+				<p class="differ">
+					{#each board.switches.projects as p (p.name)}
+						<span class="d"
+							><b>{p.name}</b>
+							{#if p.focus !== 'normal'}
+								· {p.focus}{/if}
+							{#if p.autonomy}
+								· capped at {p.autonomy}{/if}
+							{#if p.off.length > 0}
+								· off: {p.off.join(', ')}{/if}
+							{#if p.merge}
+								· merge {p.merge}{/if}</span
+						>
+					{/each}
+					{#each board.switches.characters as c (c.handle)}
+						<span class="d"
+							><b>{c.handle}</b>
+							{#if c.autonomy}
+								· capped at {c.autonomy}{/if}
+							{#if c.off.length > 0}
+								· off: {c.off.join(', ')}{/if}</span
+						>
+					{/each}
+				</p>
+			{/if}
+		</section>
+	{/if}
 
 	{#if board.attention.length > 0}
 		<section class="attention">
@@ -442,6 +514,25 @@
 				<p class="hint">Pick a card.</p>
 			{/if}
 			{#if selected?.kind === 'project'}
+				{@const pname = selected.project.name}
+				{@const pausedHere = !!board.switches?.projects.find(
+					(p) => p.name === pname && p.focus === 'paused'
+				)}
+				<div class="ask">
+					<h4>Switches</h4>
+					{#if pausedHere}
+						<p class="note">Paused. Nothing starts here until the machine says otherwise.</p>
+					{:else}
+						<button
+							class="do"
+							disabled={asking}
+							title="nothing starts on this project until it is resumed at the machine"
+							onclick={() => ask('project.pause', { project: pname })}
+						>
+							Pause {pname}
+						</button>
+					{/if}
+				</div>
 				<div class="ask">
 					<h4>Ask for work on this</h4>
 					<label>
@@ -1018,6 +1109,50 @@
 	.chip.dial.autonomous {
 		color: var(--amber);
 		border-color: rgba(255, 177, 78, 0.5);
+	}
+
+	/* ── the switchboard ────────────────────────────────────────────────────── */
+	.switches {
+		padding: 0.6rem 0 0.2rem;
+		border-bottom: 1px solid var(--rule);
+	}
+	.switches h2 {
+		font-size: var(--t-xs);
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--faint);
+		margin: 0 0 0.4rem;
+	}
+	.switches .caps {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem 0.5rem;
+	}
+	.switches .cap {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-family: var(--mono);
+		font-size: var(--t-xs);
+		padding: 0.15rem 0.45rem;
+		border: 1px solid var(--rule);
+		border-radius: 1rem;
+	}
+	.switches .cap.off {
+		color: var(--faint);
+		text-decoration: line-through;
+	}
+	.switches .cap .s {
+		text-decoration: none;
+		color: var(--faint);
+	}
+	.switches .differ {
+		margin: 0.45rem 0 0;
+		font-size: var(--t-xs);
+		color: var(--dim);
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.25rem 1rem;
 	}
 
 	.prs,

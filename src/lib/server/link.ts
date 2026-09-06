@@ -74,7 +74,16 @@ export interface Intent {
  * `work.request` is how a card gets moved into flight — it asks, and the answer
  * comes back through the next snapshot.
  */
-export const ALLOWED_INTENTS = ['pause', 'work.request', 'attention.resolve'] as const;
+export const ALLOWED_INTENTS = [
+	'pause',
+	'work.request',
+	'attention.resolve',
+	// The switchboard, in the one direction a phone may turn it: off, paused,
+	// lower. The local half refuses the reverse by name (apollod link.rs).
+	'switch.off',
+	'project.pause',
+	'autonomy.lower'
+] as const;
 export type IntentKind = (typeof ALLOWED_INTENTS)[number];
 
 export function isAllowed(kind: string): kind is IntentKind {
