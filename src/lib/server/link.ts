@@ -82,7 +82,10 @@ export const ALLOWED_INTENTS = [
 	// lower. The local half refuses the reverse by name (apollod link.rs).
 	'switch.off',
 	'project.pause',
-	'autonomy.lower'
+	'autonomy.lower',
+	// A team named from among who is on a project now. The local half refuses
+	// one that would put somebody on, and `team.clear` by name.
+	'team.set'
 ] as const;
 export type IntentKind = (typeof ALLOWED_INTENTS)[number];
 

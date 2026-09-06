@@ -121,6 +121,10 @@ export interface Project {
 	logo: string | null;
 	/** `#rrggbb`, read out of the mark. A tint, never a palette. */
 	color: string | null;
+	/** How many are on this project, Amy counted; the target is eight. Absent on older snapshots. */
+	team?: number;
+	/** Whether the project names a team of its own. Absent on older snapshots. */
+	team_named?: boolean;
 }
 
 export interface Actor {
@@ -213,6 +217,12 @@ export interface Switches {
 		/** The project's own team, when it names one. Absent on older snapshots. */
 		team?: string[];
 	}[];
+	/**
+	 * The team templates the roster makes, for one click: what to call it,
+	 * what it is for, who it names, and how big the team will be with Amy
+	 * counted. Absent on older snapshots.
+	 */
+	templates?: { key: string; name: string; what: string; members: string[]; size: number }[];
 	characters: { handle: string; autonomy: string | null; off: string[] }[];
 }
 

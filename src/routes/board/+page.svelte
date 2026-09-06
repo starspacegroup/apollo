@@ -534,6 +534,32 @@
 							Pause {pname}
 						</button>
 					{/if}
+					{#if selected.project.team !== undefined}
+						{@const over = selected.project.team - 8}
+						<p class="note" class:over={over > 0}>
+							Team of {selected.project.team}{#if over > 0}, {over} over the target of 8{/if}.
+							{#if selected.project.team_named}Named in fleet.toml.{:else}The fleet's lists decide.{/if}
+						</p>
+					{/if}
+					{#if board.switches?.templates && board.switches.templates.length > 0 && !pausedHere}
+						<div class="row">
+							{#each board.switches.templates as t (t.key)}
+								<button
+									class="do"
+									disabled={asking}
+									title="{t.what} — {t.members.join(', ')}"
+									onclick={() => ask('team.set', { project: pname, template: t.key })}
+								>
+									{t.name}
+									{t.size}
+								</button>
+							{/each}
+						</div>
+						<p class="hint">
+							One click names the team from among who is on now. The machine refuses one that would
+							put somebody on.
+						</p>
+					{/if}
 				</div>
 				<div class="ask">
 					<h4>Ask for work on this</h4>
@@ -1440,6 +1466,14 @@
 		border: 1px solid var(--rule2);
 		border-radius: 0.4rem;
 		padding: 0.35rem 0.5rem;
+	}
+	.ask .row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+	}
+	.note.over {
+		color: var(--amber, #ffb14e);
 	}
 	.ask .do {
 		font: inherit;
