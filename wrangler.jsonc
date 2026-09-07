@@ -5,6 +5,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "apollo-app-sveltekit",
+	"account_id": "7170285216abcab51100eea6730677aa",
 	"main": ".svelte-kit/cloudflare/_worker.js",
 	"compatibility_date": "2025-10-24",
 	"compatibility_flags": ["nodejs_als"],
@@ -24,8 +25,8 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "apollo-sessions",
-			"database_id": "preview-database-id"
+			"database_name": "apollo-prod",
+			"database_id": "06e5897c-0bda-4973-b329-d3ad1af94d05"
 		}
 	],
 	/**
@@ -44,7 +45,7 @@
 	"kv_namespaces": [
 		{
 			"binding": "APOLLO_SNAPSHOT",
-			"id": "replace-with-a-real-namespace-id"
+			"id": "6151ddaf784c4452881b8a4a0d61faf8"
 		}
 	]
 	/**
