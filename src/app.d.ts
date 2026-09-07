@@ -15,6 +15,7 @@ declare global {
 				email?: string | null;
 				image?: string | null;
 				username?: string;
+				provider?: string;
 			};
 			accessToken?: string;
 		}

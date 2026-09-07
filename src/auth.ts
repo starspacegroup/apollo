@@ -1,5 +1,6 @@
 import { SvelteKitAuth, type DefaultSession } from '@auth/sveltekit';
 import GitHub from '@auth/core/providers/github';
+import Discord from '@auth/core/providers/discord';
 import { env } from '$env/dynamic/private';
 
 /**
@@ -15,6 +16,11 @@ import { env } from '$env/dynamic/private';
 const GITHUB_CLIENT_ID = env.GITHUB_CLIENT_ID ?? '';
 const GITHUB_CLIENT_SECRET = env.GITHUB_CLIENT_SECRET ?? '';
 const AUTH_SECRET = env.AUTH_SECRET ?? '';
+// Discord is the door (David, 2026-09-07: "log in to it with discord and let
+// others log in with discord"). GitHub stays for the repository chat, which
+// needs a GitHub token to read repositories. Either identity is a member.
+const DISCORD_CLIENT_ID = env.DISCORD_CLIENT_ID ?? '';
+const DISCORD_CLIENT_SECRET = env.DISCORD_CLIENT_SECRET ?? '';
 
 declare module '@auth/sveltekit' {
 	interface Session {
@@ -22,12 +28,19 @@ declare module '@auth/sveltekit' {
 		user?: {
 			id?: string;
 			username?: string;
+			/** `discord` or `github` — which door they came in by. */
+			provider?: string;
 		} & DefaultSession['user'];
 	}
 }
 
 export const { handle, signIn, signOut } = SvelteKitAuth({
 	providers: [
+		Discord({
+			clientId: DISCORD_CLIENT_ID,
+			clientSecret: DISCORD_CLIENT_SECRET,
+			authorization: { params: { scope: 'identify' } }
+		}),
 		GitHub({
 			clientId: GITHUB_CLIENT_ID,
 			clientSecret: GITHUB_CLIENT_SECRET,
@@ -46,8 +59,14 @@ export const { handle, signIn, signOut } = SvelteKitAuth({
 			// Persist the OAuth access_token and user info to the token
 			if (account) {
 				token.accessToken = account.access_token;
+				token.provider = account.provider;
 				token.userId = profile?.id;
-				token.username = profile?.login;
+				// GitHub says `login`; Discord says `username` (and `global_name`
+				// for the display name a person chose).
+				token.username =
+					(profile?.login as string | undefined) ??
+					(profile?.global_name as string | undefined) ??
+					(profile?.username as string | undefined);
 			}
 			return token;
 		},
@@ -57,6 +76,7 @@ export const { handle, signIn, signOut } = SvelteKitAuth({
 				session.accessToken = token.accessToken as string;
 				session.user.id = token.userId as string;
 				session.user.username = token.username as string;
+				session.user.provider = token.provider as string;
 			}
 			return session;
 		}

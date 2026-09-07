@@ -13,8 +13,12 @@
 		type Project
 	} from '$lib/board';
 
+	import { signIn, signOut } from '@auth/sveltekit/client';
 	let { data }: { data: PageData } = $props();
 	const board = $derived(data.board);
+	// Who is reading: set by the Worker per request (access.ts). Absent in
+	// a snapshot read straight from a file.
+	const viewer = $derived(board.viewer ?? null);
 
 	type Card = { kind: 'project'; project: Project } | { kind: 'actor'; actor: Actor };
 
@@ -234,6 +238,16 @@
 			<span class="mark">A</span>
 			<span class="name">Apollo</span>
 			<span class="machine">{board.machine}</span>
+			{#if viewer}
+				<span class="chip viewer" title={viewer.id}>
+					{#if viewer.avatar}<img class="avatar" src={viewer.avatar} alt="" />{/if}
+					{viewer.name} <b>{viewer.role}</b>
+				</span>
+				{#if viewer.role !== 'guest'}<a class="chip link" href="/access">access</a>{/if}
+				<button class="chip link" onclick={() => signOut()}>sign out</button>
+			{:else if data.signedOut}
+				<button class="chip link" onclick={() => signIn('discord')}>sign in with Discord</button>
+			{/if}
 		</div>
 		<div class="meters">
 			{#if meters}
@@ -900,6 +914,23 @@
 	}
 	.card.green {
 		border-left-color: var(--green);
+	}
+	.chip.viewer {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+	}
+	.chip.viewer .avatar {
+		width: 1.1rem;
+		height: 1.1rem;
+		border-radius: 50%;
+	}
+	.chip.link {
+		cursor: pointer;
+		text-decoration: none;
+		font: inherit;
+		background: none;
+		color: inherit;
 	}
 	.card.amber {
 		border-left-color: var(--amber);

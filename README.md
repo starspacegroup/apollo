@@ -52,6 +52,35 @@ src/routes/c/[id]/         one conversation, addressable by URL
 src/routes/board/          the fleet board
 ```
 
+## Who may see what
+
+Since 2026-09-07 the board is read as somebody. Sign in is **Discord** (GitHub
+stays for the repository chat, which needs a GitHub token). A person who has
+signed in is a _member_; what they see and may do is decided in
+`src/lib/server/access.ts` and managed at `/access`:
+
+| role      | sees                              | may ask the machine for                       |
+| --------- | --------------------------------- | --------------------------------------------- |
+| **owner** | everything                        | everything the wire allows, and grants access |
+| **admin** | everything                        | everything the wire allows on every project   |
+| **guest** | the projects they hold a grant on | what their level on that project allows       |
+
+A guest's level on a project — or on `*`, every project — is **view** (sees
+it), **member** (may also ask for work on it: a request through the ladder,
+never a command) or **manager** (may also pause it, switch a capability off,
+cap its autonomy, name its team, mark its attention seen). Lowering the whole
+fleet is the owner's and an admin's alone, and nothing on the wire can raise
+anything, whoever holds it — the machine decides under the dial as before.
+
+The owner is whoever the Worker names: `APOLLO_OWNER=discord:<your user id>`
+(comma-separated for more than one). With no owner named, the first person to
+sign in on a fresh database becomes the owner, so a new deploy has one — name
+yourself before anyone else can reach it. Secrets the Worker needs:
+`AUTH_SECRET`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` (an application on
+the Discord developer portal with `https://<worker>/auth/callback/discord` as a
+redirect), `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET` for the repository chat,
+and `APOLLO_LINK_TOKEN` for the daemon. Tables: `migrations/0002_access.sql`.
+
 ## Docs
 
 - [`docs/setup.md`](docs/setup.md) — secrets, OAuth, D1, KV, deploying

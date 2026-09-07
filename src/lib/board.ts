@@ -246,6 +246,19 @@ export interface Board {
 	attention: Attend[];
 	decisions: Decided[];
 	caveats: string[];
+	/** Who is reading, and what they may see and do. Set by the Worker, per request. */
+	viewer?: Viewer;
+}
+
+/** The person the board was filtered for. */
+export interface Viewer {
+	id: string;
+	name: string;
+	avatar: string | null;
+	role: 'owner' | 'admin' | 'guest';
+	/** Every project they may see, with the level they hold: view, member or manager. */
+	projects: Record<string, 'none' | 'view' | 'member' | 'manager'>;
+	everywhere: 'none' | 'view' | 'member' | 'manager';
 }
 
 /** An honest nothing, for when no snapshot has reached the Worker. */

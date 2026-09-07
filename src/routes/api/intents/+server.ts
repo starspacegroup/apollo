@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { createIntent, isAllowed, recentIntents, ALLOWED_INTENTS } from '$lib/server/link';
+import { ensureMember, grantsOf, mayAsk, parseOwners, sessionMemberId } from '$lib/server/access';
 import type { RequestHandler } from './$types';
 
 /**
@@ -28,10 +29,18 @@ import type { RequestHandler } from './$types';
  * the server's configuration leaks to anyone who asks. An unauthenticated
  * request is a 401, whatever the reason the session could not be read.
  */
-async function whoIsAsking(locals: App.Locals): Promise<string | null> {
+async function whoIsAsking(
+	locals: App.Locals
+): Promise<{ id: string; name: string; avatar: string | null } | null> {
 	try {
 		const session = await locals.auth?.();
-		return session?.user?.username ?? session?.user?.email ?? null;
+		const id = sessionMemberId(session?.user);
+		if (!id) return null;
+		return {
+			id,
+			name: session?.user?.username ?? session?.user?.name ?? id,
+			avatar: session?.user?.image ?? null
+		};
 	} catch {
 		return null;
 	}
@@ -69,7 +78,21 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 	const text = JSON.stringify(payload);
 	if (text.length > 2000) return json({ error: 'payload too large' }, { status: 413 });
 
-	const intent = await createIntent(db, kind, payload, who);
+	// Who may ask for what: the person's role and grants, against the intent's
+	// kind and project (`access.ts`). The machine still decides; this decides
+	// whether the asking even reaches it.
+	const env = (platform?.env ?? {}) as { APOLLO_OWNER?: string };
+	const member = await ensureMember(
+		db,
+		who.id,
+		who.name,
+		who.avatar,
+		parseOwners(env.APOLLO_OWNER)
+	);
+	const no = mayAsk(kind, payload, member.role, await grantsOf(db, who.id));
+	if (no) return json({ error: no }, { status: 403 });
+
+	const intent = await createIntent(db, kind, payload, `${who.name} (${who.id})`);
 	return json({ ok: true, intent });
 };
 
