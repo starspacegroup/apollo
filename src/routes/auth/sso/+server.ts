@@ -41,7 +41,10 @@ export const GET: RequestHandler = async ({ url, platform, cookies }) => {
 	// refusing every login because the replay store is missing would be a
 	// worse failure than the one it prevents.
 	const kv = (platform?.env as Record<string, unknown> | undefined)?.APOLLO_SNAPSHOT as
-		| { get(k: string): Promise<string | null>; put(k: string, v: string, o?: unknown): Promise<void> }
+		| {
+				get(k: string): Promise<string | null>;
+				put(k: string, v: string, o?: unknown): Promise<void>;
+		  }
 		| undefined;
 	if (kv?.get) {
 		const key = `sso:${ticket.jti}`;
