@@ -13,6 +13,14 @@
 		"binding": "ASSETS",
 		"directory": ".svelte-kit/cloudflare"
 	},
+	/**
+	 * apollo.starspace.group — the owner's Live board (2026-10-05). A route
+	 * rather than a custom domain: the zone's existing proxied record stays,
+	 * and the Worker answers every request to the name. It used to be a Pages
+	 * project with no gate; that domain was detached the same day.
+	 */
+	"routes": [{ "pattern": "apollo.starspace.group/*", "zone_name": "starspace.group" }],
+	"workers_dev": true,
 	"observability": {
 		"enabled": true
 	},
