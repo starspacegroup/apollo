@@ -75,7 +75,7 @@ export const GET: RequestHandler = async ({ url, platform, cookies }) => {
 	// validated again here anyway: an open redirect on the far end is an open
 	// redirect, whoever else checked it first, and this route is reachable
 	// with any query somebody cares to type.
-	const back = url.searchParams.get('r') ?? '/board';
-	const to = back.startsWith('/') && !back.startsWith('//') ? back : '/board';
-	throw redirect(303, to === '/' ? '/board' : to);
+	const back = url.searchParams.get('r') ?? '/live';
+	const to = back.startsWith('/') && !back.startsWith('//') ? back : '/live';
+	throw redirect(303, to === '/' ? '/live' : to);
 };

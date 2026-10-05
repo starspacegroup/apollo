@@ -174,6 +174,8 @@ export function visibleBoard(board: Board, viewer: Viewer): Board {
 	}
 	return {
 		...board,
+		// The Live page is the owner's: run transcripts, every project's feed.
+		live: undefined,
 		projects: board.projects.filter((p) => allowed.has(p.name)),
 		actors: board.actors.filter((a) => {
 			const home = (a as { home?: string }).home ?? '';
@@ -328,4 +330,24 @@ export function viewerOf(member: Member, grants: Grant[], board: Board): Viewer 
 			'*'
 		)
 	};
+}
+
+/** Paths the owner gate leaves open: the ticket's landing, the build's
+ * static files, and the daemon's own token-checked `/api/link/*`. */
+export const OPEN_PATHS = ['/auth/sso', '/api/link/', '/_app/', '/favicon', '/robots.txt'];
+
+/**
+ * The owner gate's decision for one request (`hooks.server.ts`): `open` for
+ * a path nobody needs to sign in for, `pass` for the owner, `login` for
+ * somebody signed out of a page, `unauthorized` for somebody signed out of
+ * an API, `deny` for anybody else. No owner named means nobody passes.
+ */
+export function gate(
+	path: string,
+	id: string | null,
+	owners: string[]
+): 'open' | 'pass' | 'login' | 'unauthorized' | 'deny' {
+	if (OPEN_PATHS.some((o) => path === o || path.startsWith(o))) return 'open';
+	if (!id) return path.startsWith('/api/') ? 'unauthorized' : 'login';
+	return owners.includes(id) ? 'pass' : 'deny';
 }

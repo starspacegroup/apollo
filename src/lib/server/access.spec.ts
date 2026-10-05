@@ -159,3 +159,33 @@ describe('the board a person sees', () => {
 		expect(w.viewer?.role).toBe('owner');
 	});
 });
+
+describe('the owner gate', async () => {
+	const { gate } = await import('./access');
+	const owners = ['discord:293484886726279168'];
+	it('lets the owner in, everywhere', () => {
+		expect(gate('/live', 'discord:293484886726279168', owners)).toBe('pass');
+		expect(gate('/api/board', 'discord:293484886726279168', owners)).toBe('pass');
+	});
+	it('refuses anybody else who is signed in', () => {
+		expect(gate('/live', 'discord:1', owners)).toBe('deny');
+		expect(gate('/api/board', 'github:1', owners)).toBe('deny');
+	});
+	it('sends the signed out to log in, and tells an API caller 401', () => {
+		expect(gate('/live', null, owners)).toBe('login');
+		expect(gate('/', null, owners)).toBe('login');
+		expect(gate('/api/board', null, owners)).toBe('unauthorized');
+	});
+	it('leaves the ticket landing, static files and the daemon link open', () => {
+		expect(gate('/auth/sso', null, owners)).toBe('open');
+		expect(gate('/_app/immutable/x.js', null, owners)).toBe('open');
+		expect(gate('/api/link/snapshot', null, owners)).toBe('open');
+	});
+	it('fails closed when no owner is named', () => {
+		expect(gate('/live', 'discord:293484886726279168', [])).toBe('deny');
+	});
+	it('does not open a path that merely starts like an open one', () => {
+		expect(gate('/api/linked', null, owners)).toBe('unauthorized');
+		expect(gate('/auth/signin', null, owners)).toBe('login');
+	});
+});

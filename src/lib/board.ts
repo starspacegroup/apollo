@@ -7,7 +7,7 @@
  * because two hand-written definitions drift. Until then `schema` is the guard:
  * the page checks it and says so rather than rendering a shape it half knows.
  */
-export const SCHEMA = 4;
+export const SCHEMA = 5;
 
 export interface Meters {
 	five_hour: number;
@@ -248,7 +248,58 @@ export interface Board {
 	caveats: string[];
 	/** Who is reading, and what they may see and do. Set by the Worker, per request. */
 	viewer?: Viewer;
+	/** What the team is doing, as it happens. Schema 5; the owner's alone. */
+	live?: LiveView;
 }
+
+/** The Live page's data (`apollo_index::board::LiveView`). */
+export interface LiveView {
+	working: LiveRun[];
+	feed: LiveEvent[];
+	lanes: LiveLane[];
+	per_minute: number;
+	tokens_hour: number;
+}
+
+export interface LiveRun {
+	id: string;
+	handle: string;
+	name: string;
+	role: string;
+	project: string;
+	model: string | null;
+	brief: string;
+	started_at: string;
+	doing: string;
+	phase: number;
+	writes: boolean;
+	quiet_seconds: number;
+	tokens: number;
+	branch: string | null;
+	steps: { at: string; kind: string; what: string; failed: boolean }[];
+	files: [string, number][];
+}
+
+export interface LiveEvent {
+	at: string;
+	who: string;
+	project: string;
+	what: string;
+}
+
+export interface LiveLane {
+	who: string;
+	segments: {
+		project: string;
+		start: string;
+		end: string | null;
+		label: string;
+		outcome: string | null;
+	}[];
+}
+
+/** The phase track, in order — `apollo_index::live::PHASES`. */
+export const PHASES = ['Read the brief', 'Read the code', 'Edit', 'Test', 'Commit', 'Push'];
 
 /** The person the board was filtered for. */
 export interface Viewer {

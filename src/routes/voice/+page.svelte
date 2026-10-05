@@ -4,7 +4,7 @@
 
 	// Redirect to home page
 	onMount(() => {
-		goto('/');
+		goto('/chat');
 	});
 </script>
 
