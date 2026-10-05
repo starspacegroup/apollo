@@ -66,7 +66,10 @@ export const GET: RequestHandler = async ({ platform, locals }) => {
 	} catch {
 		user = undefined;
 	}
-	const id = sessionMemberId(user);
+	// Local development is the person at the keyboard, signed in or not, so a
+	// page can be rendered and looked at without a login. `dev` is false in
+	// every deployed build.
+	const id = sessionMemberId(user) ?? (dev ? 'dev:local' : null);
 	if (!id) return json({ error: 'sign in first' }, { status: 401 });
 
 	const board = await whole(platform);
