@@ -176,6 +176,7 @@ export function visibleBoard(board: Board, viewer: Viewer): Board {
 		...board,
 		// The Live page is the owner's: run transcripts, every project's feed.
 		live: undefined,
+		usage: undefined,
 		projects: board.projects.filter((p) => allowed.has(p.name)),
 		actors: board.actors.filter((a) => {
 			const home = (a as { home?: string }).home ?? '';

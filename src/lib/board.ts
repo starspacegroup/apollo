@@ -7,7 +7,7 @@
  * because two hand-written definitions drift. Until then `schema` is the guard:
  * the page checks it and says so rather than rendering a shape it half knows.
  */
-export const SCHEMA = 5;
+export const SCHEMA = 6;
 
 export interface Meters {
 	five_hour: number;
@@ -250,6 +250,15 @@ export interface Board {
 	viewer?: Viewer;
 	/** What the team is doing, as it happens. Schema 5; the owner's alone. */
 	live?: LiveView;
+	/** Claude and the local models, as series. Schema 6; the owner's alone. */
+	usage?: Usage;
+}
+
+export interface Usage {
+	windows: { at: string; five_hour: number; weekly: number; scoped: number }[];
+	tokens_by_model: { day: string; model: string; tokens: number }[];
+	ollama: { hour: string; count: number; seconds: number }[];
+	whisper: { hour: string; count: number; seconds: number }[];
 }
 
 /** The Live page's data (`apollo_index::board::LiveView`). */

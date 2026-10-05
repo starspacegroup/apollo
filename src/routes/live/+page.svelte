@@ -2,6 +2,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { PHASES, type LiveRun } from '$lib/board';
+	import UsageCharts from '$lib/UsageCharts.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -138,6 +139,8 @@
 				</div>
 			</section>
 		{/if}
+
+		{#if !focus && board.usage}<UsageCharts usage={board.usage} />{/if}
 
 		<div class="grid">
 			<section class="floor">
