@@ -424,6 +424,16 @@
 		display: block;
 		touch-action: pan-y;
 	}
+	/* A week of hourly samples needs room: on a phone the windows chart
+	   scrolls sideways in its own box rather than shrinking past reading. */
+	@media (max-width: 720px) {
+		.chart.wide {
+			overflow-x: auto;
+		}
+		.chart.wide svg {
+			min-width: 720px;
+		}
+	}
 	.grid {
 		stroke: rgba(219, 230, 245, 0.08);
 		stroke-width: 1;
