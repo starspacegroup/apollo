@@ -81,6 +81,21 @@ the Discord developer portal with `https://<worker>/auth/callback/discord` as a
 redirect), `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET` for the repository chat,
 and `APOLLO_LINK_TOKEN` for the daemon. Tables: `migrations/0002_access.sql`.
 
+## Inside Discord
+
+Since 2026-10-10 the Live screen is also a **Discord Activity** on the Apollo
+server. Discord opens the app in an iframe at `<app id>.discordsays.com`, and
+its proxy forwards that to `apollo.starspace.group` through the URL mapping
+`/` → `apollo.starspace.group` on the application's **Activities** page. The
+hub's login cannot run in that sandbox, so the Activity has a door of its own:
+Discord lands on `/`, carrying a `frame_id`, and is sent to `/activity`,
+where the Embedded App SDK asks Discord for a code; `POST /api/activity/token`
+spends it with `DISCORD_CLIENT_SECRET`, asks Discord who the token belongs to,
+and issues the same pass cookie the hub's ticket does — `SameSite=None` and
+`Partitioned`, so it lives only inside Discord's frames. Then `/live`, with
+the owner's gate unchanged: anyone on the server can open the Activity, and
+only the owner sees the board.
+
 ## Docs
 
 - [`docs/setup.md`](docs/setup.md) — secrets, OAuth, D1, KV, deploying

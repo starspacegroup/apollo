@@ -335,7 +335,29 @@ export function viewerOf(member: Member, grants: Grant[], board: Board): Viewer 
 
 /** Paths the owner gate leaves open: the ticket's landing, the build's
  * static files, and the daemon's own token-checked `/api/link/*`. */
-export const OPEN_PATHS = ['/auth/sso', '/api/link/', '/_app/', '/favicon', '/robots.txt'];
+export const OPEN_PATHS = [
+	'/auth/sso',
+	'/api/link/',
+	'/_app/',
+	'/favicon',
+	'/robots.txt',
+	// The Discord Activity's door: the page that runs the handshake and the
+	// endpoint that spends its code. Both are how a person gets a pass, not
+	// anything a pass protects.
+	'/activity',
+	'/api/activity/'
+];
+
+/**
+ * Whether a request is Discord opening the Activity. Discord loads the
+ * mapped root with its frame and instance ids in the query; nothing else
+ * arrives at `/` carrying a `frame_id`. The owner gate sends such a request
+ * to the Activity's door before it can send it to the hub's login, which a
+ * sandboxed iframe could never show.
+ */
+export function isActivityLaunch(url: URL): boolean {
+	return url.pathname === '/' && url.searchParams.has('frame_id');
+}
 
 /**
  * The owner gate's decision for one request (`hooks.server.ts`): `open` for

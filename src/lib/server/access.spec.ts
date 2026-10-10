@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { emptyBoard } from '$lib/board';
 import {
+	isActivityLaunch,
 	levelFor,
 	mayAsk,
 	memberId,
@@ -187,5 +188,21 @@ describe('the owner gate', async () => {
 	it('does not open a path that merely starts like an open one', () => {
 		expect(gate('/api/linked', null, owners)).toBe('unauthorized');
 		expect(gate('/auth/signin', null, owners)).toBe('login');
+	});
+});
+
+describe('the Activity door', async () => {
+	const { gate } = await import('./access');
+	const owners = ['discord:293484886726279168'];
+	it('is open to a stranger, because it is how they get a pass', () => {
+		expect(gate('/activity', null, owners)).toBe('open');
+		expect(gate('/api/activity/token', null, owners)).toBe('open');
+	});
+	it('recognises Discord opening the mapped root', () => {
+		expect(isActivityLaunch(new URL('https://x.discordsays.com/?frame_id=a&instance_id=b'))).toBe(
+			true
+		);
+		expect(isActivityLaunch(new URL('https://apollo.starspace.group/'))).toBe(false);
+		expect(isActivityLaunch(new URL('https://apollo.starspace.group/live?frame_id=a'))).toBe(false);
 	});
 });

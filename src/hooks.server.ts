@@ -3,7 +3,7 @@ import { env } from '$env/dynamic/private';
 import type { Handle } from '@sveltejs/kit';
 import { handle as authHandle } from './auth';
 import { PASS_COOKIE, readPass } from '$lib/server/ticket';
-import { gate, parseOwners, sessionMemberId } from '$lib/server/access';
+import { gate, isActivityLaunch, parseOwners, sessionMemberId } from '$lib/server/access';
 import { dev } from '$app/environment';
 
 /**
@@ -61,6 +61,15 @@ const LOGIN = 'https://dirac.davis9001.dev/sso?aud=apollo';
 const ownerOnly: Handle = async ({ event, resolve }) => {
 	const path = event.url.pathname;
 	if (dev) return resolve(event);
+	// Discord opening the Activity lands on `/` through its proxy; it is sent
+	// to the door that signs in by the SDK, query and all, instead of to a
+	// login page its sandbox cannot show.
+	if (isActivityLaunch(event.url)) {
+		return new Response(null, {
+			status: 302,
+			headers: { location: `/activity${event.url.search}` }
+		});
+	}
 	let user: App.Session['user'] | undefined;
 	try {
 		user = (await event.locals.auth?.())?.user;
