@@ -141,7 +141,7 @@ seated, only "Apollo" gets an answer. The seated may answer each other
 afterwards (named by the last speaker, or judged needed), three turns at
 most, and any person speaking ends it. Each agent has a voice nobody else
 has, kept in `voices.json`. The project's own on/off and the bench sit
-behind **Team** in the header, for managers. When Apollo joins a channel it posts an Activity invite in the channel's chat, so one tap opens the panel there, and its spoken intro says what to do.
+behind **Team** in the header, for managers. When Apollo joins a channel it posts an Activity link in the channel's chat (a card with Play), so one tap opens the panel there, and its spoken intro says what to do.
 
 The fuller controls — proposals, runs, pause, cap, the transcript — stay on
 the hosted board. The daemon polls for intents every ten seconds; the relay
