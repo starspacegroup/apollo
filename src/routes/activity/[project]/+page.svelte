@@ -69,6 +69,12 @@
 		)
 	);
 
+	/** `axel-6046` is Axel: the number tells names apart in the record, not to a person. */
+	function nameOf(m: Member): string {
+		const n = m.name.replace(/[-_]\d+$/, '').replace(/[-_]/g, ' ');
+		return n.charAt(0).toUpperCase() + n.slice(1);
+	}
+
 	function stateOf(m: Member, on: boolean): string {
 		const h = m.handle.toLowerCase();
 		if (speaking?.toLowerCase() === h || live?.speaking?.toLowerCase() === h) return 'speaking';
@@ -115,7 +121,7 @@
 		note = null;
 		const h = m.handle.toLowerCase();
 		seats = on ? [...seats.filter((x) => x !== h), h] : seats.filter((x) => x !== h);
-		sock.send(JSON.stringify({ t: 'seat', handle: m.handle, name: m.name, on }));
+		sock.send(JSON.stringify({ t: 'seat', handle: m.handle, name: nameOf(m), on }));
 	}
 
 	async function flip(m: Member, on: boolean) {
@@ -192,6 +198,8 @@
 			case 'state':
 				if (typeof m.thinking === 'boolean') thinking = m.thinking;
 				if (typeof m.note === 'string') note = m.note;
+				// Apollo in the voice channel says who is speaking as it happens.
+				if ('speaking' in m) speaking = typeof m.speaking === 'string' ? m.speaking : null;
 				break;
 			case 'seats':
 				seats = Array.isArray(m.seats)
@@ -200,7 +208,14 @@
 				break;
 			case 'line': {
 				const who = String(m.who);
-				caption = { who, text: String(m.spoken || m.text), mine: false };
+				const face = [...(room?.team ?? []), ...(room?.bench ?? [])].find(
+					(x) => x.handle.toLowerCase() === who.toLowerCase()
+				);
+				caption = {
+					who: face ? nameOf(face) : who === 'apollo' ? 'Apollo' : who,
+					text: String(m.spoken || m.text),
+					mine: false
+				};
 				thinking = false;
 				// Apollo in the voice channel already says it there, where everyone hears it with the
 				// rest of the call; the page playing it too would be the same line twice.
@@ -440,10 +455,10 @@
 						<div class="agent {s}" class:seated={inCall}>
 							<span class="face">
 								{#if m.face}<img src={`/api/face/${m.face}`} alt="" loading="lazy" />{:else}<i
-										>{m.name.slice(0, 1)}</i
+										>{nameOf(m).slice(0, 1)}</i
 									>{/if}
 							</span>
-							<b>{m.name}</b>
+							<b>{nameOf(m)}</b>
 							<small>{s === 'off' ? m.tag : s || 'in the call'}</small>
 							{#if member}
 								<button
@@ -451,9 +466,9 @@
 									class:on={inCall}
 									onclick={() => seat(m, !inCall)}
 									disabled={!home}
-									title={inCall ? `Send ${m.name} out of the call` : `Bring ${m.name} into the call`}
+									title={inCall ? `Send ${nameOf(m)} out of the call` : `Bring ${nameOf(m)} into the call`}
 									aria-pressed={inCall}
-									aria-label={inCall ? `${m.name} out of the call` : `${m.name} into the call`}
+									aria-label={inCall ? `${nameOf(m)} out of the call` : `${nameOf(m)} into the call`}
 									><span></span></button
 								>
 							{/if}
@@ -470,18 +485,18 @@
 						<div class="agent {s}" class:pending={flipping.has(`${m.handle}:off`)}>
 							<span class="face">
 								{#if m.face}<img src={`/api/face/${m.face}`} alt="" loading="lazy" />{:else}<i
-										>{m.name.slice(0, 1)}</i
+										>{nameOf(m).slice(0, 1)}</i
 									>{/if}
 							</span>
-							<b>{m.name}</b>
+							<b>{nameOf(m)}</b>
 							<small>{s || m.tag}</small>
 							{#if manager}
 								<button
 									class="switch on"
 									onclick={() => flip(m, false)}
 									disabled={flipping.has(`${m.handle}:off`)}
-									title="Take {m.name} off {project}"
-									aria-label="Turn {m.name} off"><span></span></button
+									title="Take {nameOf(m)} off {project}"
+									aria-label="Turn {nameOf(m)} off"><span></span></button
 								>
 							{/if}
 						</div>
@@ -490,18 +505,18 @@
 						<div class="agent off" class:pending={flipping.has(`${m.handle}:on`)}>
 							<span class="face">
 								{#if m.face}<img src={`/api/face/${m.face}`} alt="" loading="lazy" />{:else}<i
-										>{m.name.slice(0, 1)}</i
+										>{nameOf(m).slice(0, 1)}</i
 									>{/if}
 							</span>
-							<b>{m.name}</b>
+							<b>{nameOf(m)}</b>
 							<small>{m.tag}</small>
 							{#if owner}
 								<button
 									class="switch"
 									onclick={() => flip(m, true)}
 									disabled={flipping.has(`${m.handle}:on`)}
-									title="Put {m.name} on {project}"
-									aria-label="Turn {m.name} on"><span></span></button
+									title="Put {nameOf(m)} on {project}"
+									aria-label="Turn {nameOf(m)} on"><span></span></button
 								>
 							{/if}
 						</div>
