@@ -94,27 +94,37 @@ spends it with `DISCORD_CLIENT_SECRET`, asks Discord who the token belongs to,
 and issues the same pass cookie the hub's ticket does — `SameSite=None` and
 `Partitioned`, so it lives only inside Discord's frames. Then the project's page.
 
-Since 2026-10-12 the Activity is **the agents' interface** (David: _"an
-interface of the agents with interactivity to the max"_). Every project
-category on the server has a voice channel, `<tag>-voice`, and the Activity
-opened there — or in any of the project's text channels — opens on that
-project: the team down the left with faces, team names, titles and what each
-is doing right now; the room in the middle, read live and spoken into; and
-on the right the proposals with approve, edit and reject, the runs in flight
-with their phase and a stop, what needs a person, the project's recent feed,
-and the controls the wire allows — pause the project, cap its autonomy.
-Opened anywhere that is no project's channel, it asks which project.
+Since 2026-10-12 the Activity is **the agents, simply, and by voice**
+(David: _"a much more simple view of the agents, and I should be able to
+talk to them with realtime voice"_). Every project category on the server
+has a voice channel, `<tag>-voice`; the Activity opened there — or in any of
+the project's text channels — opens on that project, and shows four things:
+the team as faces, each lit when it is **speaking**, **thinking** or
+**working**; the people in the voice channel, lit when they talk; the room's
+conversation, spoken lines marked 🎙; and one box to type. Opened anywhere
+that is no project's channel, it asks which project.
 
-Every button is an intent on the same wire as the hosted board, checked
-against the viewer's level: a line or a work request needs **member**; a
-proposal answered, a run stopped or the project lowered needs **manager**.
-The owner has all of it. The daemon applies a line as David's when the
-Discord account is his and as `outside` otherwise, and the team answers it
-as it answers a line written in the channel. The snapshot carries each
-room's team, last forty lines, open proposals and runs; faces are pushed
-once per change to `/api/link/faces` and read from `/api/face/<key>`, so a
-snapshot stays under the Worker's two-megabyte limit. The daemon polls for
-intents every ten seconds and pushes within ten of a new line.
+The talking happens in the voice channel itself. `apollo-voice` (the
+daemon repository's `voice/`) joins the channel when a person is in it,
+hears each person on a stream of their own — attributed by Discord account,
+never by the sound — says what they said into the project's room as theirs
+(`apollo say --voice`, which tells the team to answer as one speaks), and
+reads the team's answers aloud in a voice per character. With two or more
+people in the channel, a line reaches the team only when Apollo or a
+teammate is named, or within forty-five seconds of the team speaking; a
+person still talking into Apollo's reply takes the floor. The page lights
+the faces from the snapshot's `voice` (apollo-voice's state, fresh within a
+minute) and from Discord's own speaking events (`rpc.voice.read`), so a mouth
+opening in the channel shows here at once.
+
+A typed line is an intent on the same wire as the hosted board, needing
+**member**; the owner has all of it. The daemon applies it as David's when
+the Discord account is his and as `outside` otherwise. The snapshot carries
+each room's team and last forty lines; faces are pushed once per change to
+`/api/link/faces` and read from `/api/face/<key>`. The daemon polls for
+intents every ten seconds and pushes within ten of a new line; the page
+reads every four. The fuller controls — proposals, runs, pause, cap — stay on
+the hosted board, one tap away.
 
 ## Docs
 
