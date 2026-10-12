@@ -180,7 +180,9 @@
 				const who = String(m.who);
 				caption = { who, text: String(m.spoken || m.text), mine: false };
 				thinking = false;
-				if (typeof m.audio === 'string' && m.audio) {
+				// Apollo in the voice channel already says it there, where everyone hears it with the
+				// rest of the call; the page playing it too would be the same line twice.
+				if (typeof m.audio === 'string' && m.audio && !live) {
 					const bytes = Uint8Array.from(atob(m.audio), (c) => c.charCodeAt(0));
 					playQueue.push({ who, blob: new Blob([bytes], { type: String(m.mime ?? 'audio/ogg') }) });
 					playNext();
