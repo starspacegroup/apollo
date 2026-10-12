@@ -289,6 +289,8 @@ export interface RoomView {
 	project: string;
 	channel: string | null;
 	team: Member[];
+	/** Who could be on the project and is not: the switches that put somebody on. */
+	bench?: Member[];
 	/** Oldest first. */
 	lines: Line[];
 	proposals: ProposalView[];

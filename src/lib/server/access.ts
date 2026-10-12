@@ -131,6 +131,9 @@ export function mayAsk(
 			if (!project) return 'a line names its project';
 			if (!atLeast(level, 'member')) return `you are not a member of ${project}`;
 			return null;
+		case 'character.on':
+			return `putting somebody on ${project || 'a project'} is the owner's`;
+		case 'character.off':
 		case 'proposal.approve':
 		case 'proposal.reject':
 		case 'run.stop':

@@ -6,6 +6,8 @@ declare namespace Cloudflare {
 		ASSETS: Fetcher;
 		OPENAI_API_KEY?: string;
 		DB: D1Database;
+		/** The Activity's voice relay (src/lib/server/relay.ts). */
+		VOICE_RELAY: DurableObjectNamespace;
 	}
 }
 interface Env extends Cloudflare.Env {}

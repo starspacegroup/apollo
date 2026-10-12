@@ -6,7 +6,13 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "apollo-app-sveltekit",
 	"account_id": "7170285216abcab51100eea6730677aa",
-	"main": ".svelte-kit/cloudflare/_worker.js",
+	// SvelteKit's generated worker, re-exported beside the voice relay's
+	// Durable Object (worker/index.ts, outside src so svelte-check leaves it be). `bun run build` first, always.
+	"main": "worker/index.ts",
+	"durable_objects": {
+		"bindings": [{ "name": "VOICE_RELAY", "class_name": "VoiceRelay" }]
+	},
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["VoiceRelay"] }],
 	"compatibility_date": "2025-10-24",
 	"compatibility_flags": ["nodejs_als"],
 	"assets": {

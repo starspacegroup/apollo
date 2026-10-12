@@ -92,7 +92,12 @@ export const ALLOWED_INTENTS = [
 	'room.say',
 	'proposal.approve',
 	'proposal.reject',
-	'run.stop'
+	'run.stop',
+	// One character on or off on one project — the switch beside each face
+	// in the Activity. Off narrows; on is the owner's alone, and the local
+	// half checks that by account id (apollod link.rs).
+	'character.off',
+	'character.on'
 ] as const;
 export type IntentKind = (typeof ALLOWED_INTENTS)[number];
 
