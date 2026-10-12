@@ -88,7 +88,14 @@
 				return;
 			}
 			const board = (await b.json()) as Board;
-			const to = landing(board, sdk.channelId);
+			// The channel names the project; failing that, the link Apollo posts in a call carries it
+			// (`custom_id`, from apollo-voice's card).
+			const named = sdk.customId
+				? (board.projects ?? []).find((p) => p.name.toLowerCase() === sdk.customId!.toLowerCase())
+				: undefined;
+			const to =
+				landing(board, sdk.channelId) ??
+				(named ? `/activity/${encodeURIComponent(named.name)}` : null);
 			if (to) {
 				await goto(to);
 				return;
