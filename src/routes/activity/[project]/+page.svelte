@@ -97,10 +97,12 @@
 				return;
 			}
 			const b = (await r.json()) as Board;
-			// A line we sent is pending until the snapshot carries it.
-			const ids = new Set((b.rooms ?? []).flatMap((x) => x.lines.map((l) => l.text + '|' + l.who)));
+			// A line we sent is pending until the snapshot carries it. Matched
+			// on the text alone: the snapshot names the speaker as the room
+			// does (`david`, or a stranger's name), not as the viewer here.
+			const said = new Set((b.rooms ?? []).flatMap((x) => x.lines.map((l) => l.text.trim())));
 			pending = pending.filter(
-				(p) => !ids.has(p.text + '|' + p.who) && Date.now() - Date.parse(p.at) < 120000
+				(p) => !said.has(p.text.trim()) && Date.now() - Date.parse(p.at) < 120000
 			);
 			board = b;
 			error = null;

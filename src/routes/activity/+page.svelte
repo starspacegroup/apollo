@@ -45,6 +45,11 @@
 			const sdk = new DiscordSDK(data.clientId);
 			await sdk.ready();
 			step = 'Asking who you are…';
+			// Discord refuses this authorize while the application has no
+			// redirect registered at all ("Missing redirect_uri", 2026-10-12),
+			// even though the code comes back over the SDK and no redirect is
+			// ever followed. The SDK takes none; one is registered on the
+			// application's OAuth2 page and that is enough.
 			const { code } = await sdk.commands.authorize({
 				client_id: data.clientId,
 				response_type: 'code',
@@ -98,7 +103,11 @@
 			}
 			step = 'Which project?';
 		} catch (e) {
-			failed = e instanceof Error ? e.message : String(e);
+			// The SDK throws plain objects, `{code, message}`; say what they
+			// say, and at which step, rather than `[object Object]`.
+			const said =
+				e instanceof Error ? e.message : typeof e === 'object' && e ? JSON.stringify(e) : String(e);
+			failed = `${step} ${said}`;
 		}
 	});
 </script>
