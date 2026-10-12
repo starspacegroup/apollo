@@ -36,6 +36,27 @@ export async function participants(): Promise<Participant[]> {
 	}
 }
 
+/** Who is talking in the voice channel, from Discord itself: a user id each time a mouth opens or closes. */
+export function onSpeaking(
+	channelId: string,
+	cb: (userId: string, speaking: boolean) => void
+): () => void {
+	if (!sdk) return () => {};
+	const start = (e: { user_id: string }) => cb(e.user_id, true);
+	const stop = (e: { user_id: string }) => cb(e.user_id, false);
+	const s = sdk;
+	void s.subscribe('SPEAKING_START', start, { channel_id: channelId }).catch(() => {});
+	void s.subscribe('SPEAKING_STOP', stop, { channel_id: channelId }).catch(() => {});
+	return () => {
+		void s.unsubscribe('SPEAKING_START', start, { channel_id: channelId }).catch(() => {});
+		void s.unsubscribe('SPEAKING_STOP', stop, { channel_id: channelId }).catch(() => {});
+	};
+}
+
+export function channelId(): string | null {
+	return sdk?.channelId ?? null;
+}
+
 /** A link out of the sandbox. Inside Discord a plain `<a target=_blank>` goes nowhere. */
 export async function openLink(url: string) {
 	if (sdk) {

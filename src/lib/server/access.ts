@@ -191,6 +191,7 @@ export function visibleBoard(board: Board, viewer: Viewer): Board {
 		discord: board.discord
 			? { channels: board.discord.channels.filter((c) => allowed.has(c.project)) }
 			: undefined,
+		voice: board.voice && allowed.has(board.voice.project) ? board.voice : undefined,
 		projects: board.projects.filter((p) => allowed.has(p.name)),
 		actors: board.actors.filter((a) => {
 			const home = (a as { home?: string }).home ?? '';

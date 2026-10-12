@@ -256,6 +256,24 @@ export interface Board {
 	rooms?: RoomView[];
 	/** Which Discord channel is which project. */
 	discord?: DiscordMap;
+	/** Apollo in a voice channel right now, as apollo-voice last wrote it. Absent when it is nowhere. */
+	voice?: VoiceView;
+}
+
+/** Where Apollo is listening and speaking (apollod `voice/`, 2026-10-12). */
+export interface VoiceView {
+	channel: string;
+	project: string;
+	since: number;
+	people: { id: string; name: string }[];
+	/** Discord ids being heard right now. */
+	hearing: string[];
+	/** The handle whose line is being read aloud, or null. */
+	speaking: string | null;
+	/** A spoken line went to the team and nothing has come back yet. */
+	thinking: boolean;
+	heard: { who: string; text: string; at: number }[];
+	updated: number;
 }
 
 export interface Usage {

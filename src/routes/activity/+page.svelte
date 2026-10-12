@@ -56,7 +56,8 @@
 				response_type: 'code',
 				state: '',
 				prompt: 'none',
-				scope: ['identify']
+				// `rpc.voice.read` is for the speaking events the project page shows.
+				scope: ['identify', 'rpc.voice.read']
 			});
 			step = 'Signing in…';
 			const res = await fetch('/api/activity/token', {
