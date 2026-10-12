@@ -71,7 +71,9 @@
 
 	/** `axel-6046` is Axel: the number tells names apart in the record, not to a person. */
 	function nameOf(m: Member): string {
-		const n = m.name.replace(/[-_]\d+$/, '').replace(/[-_]/g, ' ');
+		// `davis9001` is a name in its own right; everyone else's number is a tiebreak.
+		if (m.name.toLowerCase() === m.handle.toLowerCase()) return m.name;
+		const n = m.name.replace(/[-_.\s]*\d+$/, '').replace(/[-_]/g, ' ') || m.name;
 		return n.charAt(0).toUpperCase() + n.slice(1);
 	}
 
@@ -213,7 +215,7 @@
 				);
 				caption = {
 					who: face ? nameOf(face) : who === 'apollo' ? 'Apollo' : who,
-					text: String(m.spoken || m.text),
+					text: String(m.text || m.spoken),
 					mine: false
 				};
 				thinking = false;
@@ -527,10 +529,10 @@
 
 		<footer>
 			{#if caption}
-				<p class="caption" class:mine={caption.mine}>
-					{#if caption.who}<b>{caption.who}</b>{/if}
-					{caption.text}
-				</p>
+				{#key caption}
+					<!-- prettier-ignore -->
+					<p class="caption" class:mine={caption.mine}>{#if caption.who}<b>{caption.who}</b>{/if}{caption.text.trim()}</p>
+				{/key}
 			{:else}
 				<p class="caption dim">
 					{#if !home}The machine is away; your words will wait.{:else if seats.length === 0}Switch an agent into the call to talk to it, or
@@ -787,11 +789,12 @@
 		min-height: 1.4em;
 		font-size: 14px;
 		color: #e6ebf2;
-		display: -webkit-box;
-		-webkit-line-clamp: 3;
-		line-clamp: 3;
-		-webkit-box-orient: vertical;
-		overflow: hidden;
+		/* The whole line, scrolling when it is long; the grid keeps the rest of the screen. */
+		max-height: 38dvh;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		white-space: pre-line;
+		overflow-wrap: anywhere;
 	}
 	.caption b {
 		color: var(--c);
