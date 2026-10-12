@@ -94,37 +94,44 @@ spends it with `DISCORD_CLIENT_SECRET`, asks Discord who the token belongs to,
 and issues the same pass cookie the hub's ticket does — `SameSite=None` and
 `Partitioned`, so it lives only inside Discord's frames. Then the project's page.
 
-Since 2026-10-12 the Activity is **the agents, simply, and by voice**
-(David: _"a much more simple view of the agents, and I should be able to
-talk to them with realtime voice"_). Every project category on the server
-has a voice channel, `<tag>-voice`; the Activity opened there — or in any of
-the project's text channels — opens on that project, and shows four things:
-the team as faces, each lit when it is **speaking**, **thinking** or
-**working**; the people in the voice channel, lit when they talk; the room's
-conversation, spoken lines marked 🎙; and one box to type. Opened anywhere
-that is no project's channel, it asks which project.
+Since 2026-10-12 the Activity is **just the agents** (David: _"the activity
+interface to just be the agents, I should be able to turn them off and on,
+mobile first responsive, and I should be able to talk to them over voice
+chat through the activity"_). Opened in any of a project's channels — its
+text channels or its `<tag>-voice` — it opens on that project: a grid of
+faces, the team first and the bench after, each lit when **speaking**,
+**thinking** or **working**, greyed when off, with a switch beside it; and
+one mic. Opened anywhere that is no project's channel, it asks which project.
 
-The talking happens in the voice channel itself. `apollo-voice` (the
-daemon repository's `voice/`) joins the channel when a person is in it,
-hears each person on a stream of their own — attributed by Discord account,
-never by the sound — says what they said into the project's room as theirs
+**The switch.** Off is `character.off` on the wire, a manager's or the
+owner's; on is `character.on`, the owner's alone — the one raise the wire
+carries, and the daemon checks the asking account by id before it puts
+anybody on. The snapshot's rooms carry a `bench` beside the `team` so the
+page knows who it could put on.
+
+**The voice.** Tap the mic and the page listens: it watches the level, cuts
+an utterance at nine hundred milliseconds of quiet, and sends it whole over
+a WebSocket to the **voice relay**, a Durable Object (`src/lib/server/relay.ts`)
+that holds every viewer's socket and one socket from home. Home is
+`apollo-voice` (the daemon repository's `voice/`): it hears the recording
+with whisper, says it into the project's room as the viewer's own line
 (`apollo say --voice`, which tells the team to answer as one speaks), and
-reads the team's answers aloud in a voice per character. With two or more
-people in the channel, a line reaches the team only when Apollo or a
-teammate is named, or within forty-five seconds of the team speaking; a
-person still talking into Apollo's reply takes the floor. The page lights
-the faces from the snapshot's `voice` (apollo-voice's state, fresh within a
-minute) and from Discord's own speaking events (`rpc.voice.read`), so a mouth
-opening in the channel shows here at once.
+reads the room's answers back to every viewer of the project as text and as
+ogg, one voice per character; the page plays them in turn with the speaking
+face lit, and speech over the team's voice stops it. A viewer reaches the
+relay with a two-minute ticket signed with `AUTH_SECRET`, issued by
+`POST /api/activity/voice/ticket` only for a project they may speak in;
+home carries the link token. The upgrade is answered in `worker/index.ts`
+before SvelteKit, because a Durable Object's 101 has immutable headers and
+SvelteKit's cookie pass throws on them — which is also why the adapter is
+pointed at `wrangler.build.jsonc` and the real `wrangler.jsonc` names the
+entry that exports the Durable Object. The same process also sits in the
+project's Discord voice channel when a person is there, hearing each one on
+their own stream and answering aloud there too.
 
-A typed line is an intent on the same wire as the hosted board, needing
-**member**; the owner has all of it. The daemon applies it as David's when
-the Discord account is his and as `outside` otherwise. The snapshot carries
-each room's team and last forty lines; faces are pushed once per change to
-`/api/link/faces` and read from `/api/face/<key>`. The daemon polls for
-intents every ten seconds and pushes within ten of a new line; the page
-reads every four. The fuller controls — proposals, runs, pause, cap — stay on
-the hosted board, one tap away.
+The fuller controls — proposals, runs, pause, cap, the transcript — stay on
+the hosted board. The daemon polls for intents every ten seconds; the relay
+is live.
 
 ## Docs
 
