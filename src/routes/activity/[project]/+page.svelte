@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { brandOf, type Board, type Member, type RoomView } from '$lib/board';
+	import { getSdk } from '$lib/activity';
 	import type { PageData } from './$types';
 
 	/**
@@ -16,6 +17,12 @@
 	 * project's room as yours; the team's answers come back the same way as
 	 * text and as speech, and the face that is speaking is lit. Nothing here
 	 * starts work: a line is a line, a switch is the fleet's own switch.
+	 *
+	 * Inside Discord the frame never gets the microphone (discord/embedded-
+	 * app-sdk#363, open), so there the voice is the voice channel itself:
+	 * the person is already in it, Apollo joins it, and this page is the
+	 * faces lighting as the channel is heard and answered. The mic here is
+	 * for the same page opened in a browser.
 	 */
 	let { data }: { data: PageData } = $props();
 
@@ -34,6 +41,11 @@
 	let flipping = $state<Set<string>>(new Set());
 
 	const project = $derived(data.project);
+	const inDiscord = getSdk() !== null;
+	/** Apollo in this project's voice channel right now (apollod voice.json by way of the snapshot). */
+	const live = $derived(
+		board?.voice && board.voice.project.toLowerCase() === data.project.toLowerCase() ? board.voice : null
+	);
 	const proj = $derived(board?.projects.find((p) => p.name === project) ?? null);
 	const brand = $derived(brandOf(proj));
 	const room: RoomView | null = $derived(
@@ -55,9 +67,9 @@
 
 	function stateOf(m: Member, on: boolean): string {
 		const h = m.handle.toLowerCase();
-		if (speaking?.toLowerCase() === h) return 'speaking';
+		if (speaking?.toLowerCase() === h || live?.speaking?.toLowerCase() === h) return 'speaking';
 		if (working.has(h)) return 'working';
-		if (on && thinking) return 'thinking';
+		if (on && (thinking || live?.thinking)) return 'thinking';
 		return on ? '' : 'off';
 	}
 
@@ -227,7 +239,9 @@
 				audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
 			});
 		} catch {
-			note = 'The microphone was refused. Allow it and tap again.';
+			note = inDiscord
+				? "Discord keeps the microphone from an Activity. Talk in the project's voice channel; Apollo is there."
+				: 'The microphone was refused. Allow it and tap again.';
 			return;
 		}
 		ctx = new AudioContext();
@@ -438,7 +452,9 @@
 				</p>
 			{:else}
 				<p class="caption dim">
-					{#if !home}The machine is away; your words will wait.{:else if member}Tap the mic and
+					{#if !home}The machine is away; your words will wait.{:else if live}Apollo is in the
+						voice channel with you. Just talk.{:else if inDiscord && member}Join the project's
+						voice channel and talk; Apollo follows you in.{:else if member}Tap the mic and
 						talk.{:else}You can watch; the owner grants a seat to speak.{/if}
 				</p>
 			{/if}
@@ -464,16 +480,22 @@
 						<button class="ghost kb" onclick={() => (typing = true)} aria-label="Type instead"
 							>⌨</button
 						>
-						<button
-							class="mic"
-							class:on={listening}
-							class:hot={hearing}
-							onclick={toggleMic}
-							aria-pressed={listening}
-							aria-label={listening ? 'Stop listening' : 'Talk'}
-						>
-							{listening ? '■' : '🎙'}
-						</button>
+						{#if inDiscord}
+							<span class="mic ear" class:on={!!live} class:hot={(live?.hearing.length ?? 0) > 0} aria-label={live ? 'Apollo is listening in the voice channel' : 'Apollo is not in a voice channel'}>
+								🎧
+							</span>
+						{:else}
+							<button
+								class="mic"
+								class:on={listening}
+								class:hot={hearing}
+								onclick={toggleMic}
+								aria-pressed={listening}
+								aria-label={listening ? 'Stop listening' : 'Talk'}
+							>
+								{listening ? '■' : '🎙'}
+							</button>
+						{/if}
 						<button class="ghost kb" onclick={hush} aria-label="Quiet" title="Stop the voice"
 							>🔇</button
 						>
@@ -723,6 +745,16 @@
 	}
 	.mic.hot {
 		box-shadow: 0 0 0 8px color-mix(in srgb, var(--c) 25%, transparent);
+	}
+	.ear {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		cursor: default;
+		opacity: 0.45;
+	}
+	.ear.on {
+		opacity: 1;
 	}
 	.kb {
 		font-size: 20px;
