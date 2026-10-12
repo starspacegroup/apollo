@@ -129,6 +129,20 @@ entry that exports the Durable Object. The same process also sits in the
 project's Discord voice channel when a person is there, hearing each one on
 their own stream and answering aloud there too.
 
+**The call.** Inside Discord the frame never gets the microphone (Discord's
+Activity iframe carries no microphone policy), so there the voice is the
+voice channel: Apollo joins it, everyone in it hears each other and the
+team as one call, and the page stays quiet while Apollo is in the channel
+so no line is heard twice. Each face's switch seats that agent in the call;
+all are off until somebody switches one in, and the seats clear when the
+call empties. Only the seated answer a spoken line — the one named aloud,
+or the only one seated, or the router's choice among them; with nobody
+seated, only "Apollo" gets an answer. The seated may answer each other
+afterwards (named by the last speaker, or judged needed), three turns at
+most, and any person speaking ends it. Each agent has a voice nobody else
+has, kept in `voices.json`. The project's own on/off and the bench sit
+behind **Team** in the header, for managers.
+
 The fuller controls — proposals, runs, pause, cap, the transcript — stay on
 the hosted board. The daemon polls for intents every ten seconds; the relay
 is live.
