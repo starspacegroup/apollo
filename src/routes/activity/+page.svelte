@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { setSdk } from '$lib/activity';
+	import { landing } from '$lib/launch';
 	import type { Board } from '$lib/board';
 	import type { PageData } from './$types';
 
@@ -86,12 +87,9 @@
 				return;
 			}
 			const board = (await b.json()) as Board;
-			const here = sdk.channelId;
-			const hit = here ? board.discord?.channels.find((c) => c.id === here) : undefined;
-			if (hit) {
-				const room =
-					hit.room && hit.room !== hit.project ? `?room=${encodeURIComponent(hit.room)}` : '';
-				await goto(`/activity/${encodeURIComponent(hit.project)}${room}`);
+			const to = landing(board, sdk.channelId);
+			if (to) {
+				await goto(to);
 				return;
 			}
 			// Opened somewhere that is no project's channel: a DM, the
