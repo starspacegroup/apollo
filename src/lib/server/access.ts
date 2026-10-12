@@ -127,6 +127,16 @@ export function mayAsk(
 			if (!project) return `${kind} for the whole fleet is the owner's`;
 			if (!atLeast(level, 'manager')) return `you do not manage ${project}`;
 			return null;
+		case 'room.say':
+			if (!project) return 'a line names its project';
+			if (!atLeast(level, 'member')) return `you are not a member of ${project}`;
+			return null;
+		case 'proposal.approve':
+		case 'proposal.reject':
+		case 'run.stop':
+			if (!project) return `${kind} names a project`;
+			if (!atLeast(level, 'manager')) return `you do not manage ${project}`;
+			return null;
 		case 'attention.resolve':
 			// The item's project is not in the payload; the machine checks the
 			// id. A guest with nothing to manage has nothing to resolve.
@@ -177,6 +187,10 @@ export function visibleBoard(board: Board, viewer: Viewer): Board {
 		// The Live page is the owner's: run transcripts, every project's feed.
 		live: undefined,
 		usage: undefined,
+		rooms: board.rooms?.filter((r) => allowed.has(r.project)),
+		discord: board.discord
+			? { channels: board.discord.channels.filter((c) => allowed.has(c.project)) }
+			: undefined,
 		projects: board.projects.filter((p) => allowed.has(p.name)),
 		actors: board.actors.filter((a) => {
 			const home = (a as { home?: string }).home ?? '';

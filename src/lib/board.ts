@@ -252,6 +252,10 @@ export interface Board {
 	live?: LiveView;
 	/** Claude and the local models, as series. Schema 6; the owner's alone. */
 	usage?: Usage;
+	/** The rooms, their teams, lines and what waits — the Activity's data. */
+	rooms?: RoomView[];
+	/** Which Discord channel is which project. */
+	discord?: DiscordMap;
 }
 
 export interface Usage {
@@ -259,6 +263,63 @@ export interface Usage {
 	tokens_by_model: { day: string; model: string; tokens: number }[];
 	ollama: { hour: string; count: number; seconds: number }[];
 	whisper: { hour: string; count: number; seconds: number }[];
+}
+
+/** A room as the Activity shows it (`apollo_index::board::RoomView`). */
+export interface RoomView {
+	room: string;
+	project: string;
+	channel: string | null;
+	team: Member[];
+	/** Oldest first. */
+	lines: Line[];
+	proposals: ProposalView[];
+	runs: RunView[];
+}
+
+export interface Member {
+	handle: string;
+	name: string;
+	tag: string;
+	purpose: string;
+	/** `GET /api/face/<face>` on this Worker, or none. */
+	face: string | null;
+}
+
+export interface Line {
+	id: number;
+	at: string;
+	who: string;
+	name: string;
+	tag: string | null;
+	kind: string;
+	provenance: string;
+	text: string;
+	reference: string | null;
+	files: { id: number; name: string; mime: string; bytes: number }[];
+}
+
+export interface ProposalView {
+	id: number;
+	at: string;
+	character: string;
+	name: string;
+	note: string;
+}
+
+export interface RunView {
+	id: string;
+	character: string;
+	name: string;
+	state: 'running' | 'finished' | 'failed' | 'stopped';
+	started_at: string;
+	ended_at: string | null;
+	prompt: string;
+	branch: string | null;
+}
+
+export interface DiscordMap {
+	channels: { id: string; project: string; room: string | null; kind: 'text' | 'voice' }[];
 }
 
 /** The Live page's data (`apollo_index::board::LiveView`). */

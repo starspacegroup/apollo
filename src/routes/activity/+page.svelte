@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { setSdk } from '$lib/activity';
+	import type { Board } from '$lib/board';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -17,12 +19,15 @@
 	 * door the sandbox has — the Embedded App SDK asks Discord for a code,
 	 * `/api/activity/token` spends it for a token and asks Discord who that
 	 * is, and the answer is a pass cookie of this app's own, the same one the
-	 * hub's ticket ends in. From then on `/live` is the Live screen, as it is
-	 * in a browser; the owner's gate is unchanged and still decides who sees
-	 * it.
+	 * hub's ticket ends in.
+	 *
+	 * Then, since 2026-10-12, the room: the channel the Activity was opened
+	 * in — a project's voice channel, or one of its text channels — names the
+	 * project, and the project's page opens. Opened anywhere else, it asks.
 	 */
 	let step = $state('Opening…');
 	let failed: string | null = $state(null);
+	let choices: { name: string; color: string | null; logo: string | null }[] = $state([]);
 
 	onMount(async () => {
 		const frame = new URLSearchParams(location.search).get('frame_id');
@@ -63,7 +68,35 @@
 				failed = 'Discord did not confirm the sign-in.';
 				return;
 			}
-			await goto('/live');
+			setSdk(sdk);
+
+			step = 'Finding the room…';
+			const b = await fetch('/api/board');
+			if (b.status === 403) {
+				failed = 'This is a private board. You are signed in, but it is not yours.';
+				return;
+			}
+			if (!b.ok) {
+				failed = `The board answered ${b.status}.`;
+				return;
+			}
+			const board = (await b.json()) as Board;
+			const here = sdk.channelId;
+			const hit = here ? board.discord?.channels.find((c) => c.id === here) : undefined;
+			if (hit) {
+				const room =
+					hit.room && hit.room !== hit.project ? `?room=${encodeURIComponent(hit.room)}` : '';
+				await goto(`/activity/${encodeURIComponent(hit.project)}${room}`);
+				return;
+			}
+			// Opened somewhere that is no project's channel: a DM, the
+			// server's front door. Ask which project.
+			choices = (board.projects ?? []).map((p) => ({ name: p.name, color: p.color, logo: p.logo }));
+			if (choices.length === 0) {
+				failed = 'No project is yours to see here yet.';
+				return;
+			}
+			step = 'Which project?';
 		} catch (e) {
 			failed = e instanceof Error ? e.message : String(e);
 		}
@@ -77,6 +110,20 @@
 <main>
 	{#if failed}
 		<p class="bad">{failed}</p>
+	{:else if choices.length > 0}
+		<div class="pick">
+			<p>{step}</p>
+			<ul>
+				{#each choices as c (c.name)}
+					<li>
+						<a href={`/activity/${encodeURIComponent(c.name)}`} style:--c={c.color ?? '#59d9ff'}>
+							{#if c.logo}<img src={c.logo} alt="" />{/if}
+							<span>{c.name}</span>
+						</a>
+					</li>
+				{/each}
+			</ul>
+		</div>
 	{:else}
 		<p>{step}</p>
 	{/if}
@@ -99,5 +146,41 @@
 		max-width: 32rem;
 		text-align: center;
 		padding: 0 1rem;
+	}
+	.pick {
+		width: min(100%, 36rem);
+		padding: 1rem;
+	}
+	.pick p {
+		color: #8fa3bd;
+		margin: 0 0 0.75rem;
+	}
+	.pick ul {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+		gap: 0.5rem;
+	}
+	.pick a {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.6rem 0.75rem;
+		border: 1px solid #1d2636;
+		border-left: 3px solid var(--c);
+		border-radius: 6px;
+		color: inherit;
+		text-decoration: none;
+		background: #0b0f18;
+	}
+	.pick a:hover {
+		background: #121a28;
+	}
+	.pick img {
+		width: 20px;
+		height: 20px;
+		object-fit: contain;
 	}
 </style>

@@ -92,9 +92,29 @@ Discord lands on `/`, carrying a `frame_id`, and is sent to `/activity`,
 where the Embedded App SDK asks Discord for a code; `POST /api/activity/token`
 spends it with `DISCORD_CLIENT_SECRET`, asks Discord who the token belongs to,
 and issues the same pass cookie the hub's ticket does — `SameSite=None` and
-`Partitioned`, so it lives only inside Discord's frames. Then `/live`, with
-the owner's gate unchanged: anyone on the server can open the Activity, and
-only the owner sees the board.
+`Partitioned`, so it lives only inside Discord's frames. Then the project's page.
+
+Since 2026-10-12 the Activity is **the agents' interface** (David: _"an
+interface of the agents with interactivity to the max"_). Every project
+category on the server has a voice channel, `<tag>-voice`, and the Activity
+opened there — or in any of the project's text channels — opens on that
+project: the team down the left with faces, team names, titles and what each
+is doing right now; the room in the middle, read live and spoken into; and
+on the right the proposals with approve, edit and reject, the runs in flight
+with their phase and a stop, what needs a person, the project's recent feed,
+and the controls the wire allows — pause the project, cap its autonomy.
+Opened anywhere that is no project's channel, it asks which project.
+
+Every button is an intent on the same wire as the hosted board, checked
+against the viewer's level: a line or a work request needs **member**; a
+proposal answered, a run stopped or the project lowered needs **manager**.
+The owner has all of it. The daemon applies a line as David's when the
+Discord account is his and as `outside` otherwise, and the team answers it
+as it answers a line written in the channel. The snapshot carries each
+room's team, last forty lines, open proposals and runs; faces are pushed
+once per change to `/api/link/faces` and read from `/api/face/<key>`, so a
+snapshot stays under the Worker's two-megabyte limit. The daemon polls for
+intents every ten seconds and pushes within ten of a new line.
 
 ## Docs
 
