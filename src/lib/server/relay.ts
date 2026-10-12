@@ -90,14 +90,25 @@ export class VoiceRelay extends DurableObject<Env> {
 			ws.send(JSON.stringify({ t: 'pong', home: this.home() !== null }));
 			return;
 		}
-		if (msg.t === 'utter' || msg.t === 'say') {
+		if (msg.t === 'utter' || msg.t === 'say' || msg.t === 'seat') {
+			const body =
+				msg.t === 'utter'
+					? { audio: msg.audio, mime: msg.mime }
+					: msg.t === 'say'
+						? { text: msg.text }
+						: // An agent into or out of the call (`apollo-voice` keeps the seats).
+							{
+								handle: String(msg.handle ?? '').slice(0, 64),
+								name: String(msg.name ?? '').slice(0, 64),
+								on: msg.on === true
+							};
 			const stamped = {
 				t: msg.t,
 				project: att.project,
 				who: att.provenance === 'david' ? 'david' : att.name,
 				id: att.id,
 				provenance: att.provenance,
-				...(msg.t === 'utter' ? { audio: msg.audio, mime: msg.mime } : { text: msg.text })
+				...body
 			};
 			if (!this.tellHome(stamped)) ws.send(JSON.stringify({ t: 'home', on: false }));
 		}

@@ -39,6 +39,10 @@
 	let draft = $state('');
 	let typing = $state(false);
 	let flipping = $state<Set<string>>(new Set());
+	/** The agents in this project's call (apollo-voice keeps them; off until switched in). */
+	let seats = $state<string[]>([]);
+	/** The team's own on/off for the project, behind a toggle so the call's switches stay simple. */
+	let teamMode = $state(false);
 
 	const project = $derived(data.project);
 	const inDiscord = getSdk() !== null;
@@ -100,6 +104,18 @@
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		}
+	}
+
+	/** Bring an agent into the call or send it out. Takes effect at home; the answer comes back as `seats`. */
+	function seat(m: Member, on: boolean) {
+		if (!sock || sock.readyState !== WebSocket.OPEN) {
+			note = 'Not connected to the machine yet.';
+			return;
+		}
+		note = null;
+		const h = m.handle.toLowerCase();
+		seats = on ? [...seats.filter((x) => x !== h), h] : seats.filter((x) => x !== h);
+		sock.send(JSON.stringify({ t: 'seat', handle: m.handle, name: m.name, on }));
 	}
 
 	async function flip(m: Member, on: boolean) {
@@ -175,6 +191,12 @@
 				break;
 			case 'state':
 				if (typeof m.thinking === 'boolean') thinking = m.thinking;
+				if (typeof m.note === 'string') note = m.note;
+				break;
+			case 'seats':
+				seats = Array.isArray(m.seats)
+					? (m.seats as { handle?: string }[]).map((x) => String(x?.handle ?? '').toLowerCase())
+					: [];
 				break;
 			case 'line': {
 				const who = String(m.who);
@@ -384,6 +406,15 @@
 		{#if brand.logo}<img class="mark" src={brand.logo} alt="" />{/if}
 		<h1>{project}</h1>
 		<span class="grow"></span>
+		{#if manager}
+			<button
+				class="ghost mode"
+				class:active={teamMode}
+				onclick={() => (teamMode = !teamMode)}
+				title={teamMode ? 'Back to the call' : "The project's team, on and off"}
+				>{teamMode ? 'Call' : 'Team'}</button
+			>
+		{/if}
 		<span
 			class="pill"
 			class:live={home}
@@ -401,49 +432,82 @@
 		<p class="dim center">No room for {project} has reached here yet.</p>
 	{:else}
 		<main>
-			<section class="agents">
-				{#each room.team as m (m.handle)}
-					{@const s = stateOf(m, true)}
-					<div class="agent {s}" class:pending={flipping.has(`${m.handle}:off`)}>
-						<span class="face">
-							{#if m.face}<img src={`/api/face/${m.face}`} alt="" loading="lazy" />{:else}<i
-									>{m.name.slice(0, 1)}</i
-								>{/if}
-						</span>
-						<b>{m.name}</b>
-						<small>{s || m.tag}</small>
-						{#if manager}
-							<button
-								class="switch on"
-								onclick={() => flip(m, false)}
-								disabled={flipping.has(`${m.handle}:off`)}
-								title="Take {m.name} off {project}"
-								aria-label="Turn {m.name} off"><span></span></button
-							>
-						{/if}
-					</div>
-				{/each}
-				{#each room.bench ?? [] as m (m.handle)}
-					<div class="agent off" class:pending={flipping.has(`${m.handle}:on`)}>
-						<span class="face">
-							{#if m.face}<img src={`/api/face/${m.face}`} alt="" loading="lazy" />{:else}<i
-									>{m.name.slice(0, 1)}</i
-								>{/if}
-						</span>
-						<b>{m.name}</b>
-						<small>{m.tag}</small>
-						{#if owner}
-							<button
-								class="switch"
-								onclick={() => flip(m, true)}
-								disabled={flipping.has(`${m.handle}:on`)}
-								title="Put {m.name} on {project}"
-								aria-label="Turn {m.name} on"><span></span></button
-							>
-						{/if}
-					</div>
-				{/each}
-			</section>
+			{#if !teamMode}
+				<section class="agents">
+					{#each room.team as m (m.handle)}
+						{@const inCall = seats.includes(m.handle.toLowerCase())}
+						{@const s = stateOf(m, inCall)}
+						<div class="agent {s}" class:seated={inCall}>
+							<span class="face">
+								{#if m.face}<img src={`/api/face/${m.face}`} alt="" loading="lazy" />{:else}<i
+										>{m.name.slice(0, 1)}</i
+									>{/if}
+							</span>
+							<b>{m.name}</b>
+							<small>{s === 'off' ? m.tag : s || 'in the call'}</small>
+							{#if member}
+								<button
+									class="switch"
+									class:on={inCall}
+									onclick={() => seat(m, !inCall)}
+									disabled={!home}
+									title={inCall ? `Send ${m.name} out of the call` : `Bring ${m.name} into the call`}
+									aria-pressed={inCall}
+									aria-label={inCall ? `${m.name} out of the call` : `${m.name} into the call`}
+									><span></span></button
+								>
+							{/if}
+						</div>
+					{/each}
+				</section>
+				{#if room.team.length === 0}
+					<p class="dim center">Nobody is on {project}. Turn somebody on under Team.</p>
+				{/if}
+			{:else}
+				<section class="agents">
+					{#each room.team as m (m.handle)}
+						{@const s = stateOf(m, true)}
+						<div class="agent {s}" class:pending={flipping.has(`${m.handle}:off`)}>
+							<span class="face">
+								{#if m.face}<img src={`/api/face/${m.face}`} alt="" loading="lazy" />{:else}<i
+										>{m.name.slice(0, 1)}</i
+									>{/if}
+							</span>
+							<b>{m.name}</b>
+							<small>{s || m.tag}</small>
+							{#if manager}
+								<button
+									class="switch on"
+									onclick={() => flip(m, false)}
+									disabled={flipping.has(`${m.handle}:off`)}
+									title="Take {m.name} off {project}"
+									aria-label="Turn {m.name} off"><span></span></button
+								>
+							{/if}
+						</div>
+					{/each}
+					{#each room.bench ?? [] as m (m.handle)}
+						<div class="agent off" class:pending={flipping.has(`${m.handle}:on`)}>
+							<span class="face">
+								{#if m.face}<img src={`/api/face/${m.face}`} alt="" loading="lazy" />{:else}<i
+										>{m.name.slice(0, 1)}</i
+									>{/if}
+							</span>
+							<b>{m.name}</b>
+							<small>{m.tag}</small>
+							{#if owner}
+								<button
+									class="switch"
+									onclick={() => flip(m, true)}
+									disabled={flipping.has(`${m.handle}:on`)}
+									title="Put {m.name} on {project}"
+									aria-label="Turn {m.name} on"><span></span></button
+								>
+							{/if}
+						</div>
+					{/each}
+				</section>
+			{/if}
 		</main>
 
 		<footer>
@@ -454,7 +518,8 @@
 				</p>
 			{:else}
 				<p class="caption dim">
-					{#if !home}The machine is away; your words will wait.{:else if live}Apollo is in the
+					{#if !home}The machine is away; your words will wait.{:else if seats.length === 0}Switch an agent into the call to talk to it, or
+						say "Apollo".{:else if live}Apollo is in the
 						voice channel with you. Just talk.{:else if inDiscord && member}Join the project's
 						voice channel and talk; Apollo follows you in.{:else if member}Tap the mic and
 						talk.{:else}You can watch; the owner grants a seat to speak.{/if}
@@ -747,6 +812,16 @@
 	}
 	.mic.hot {
 		box-shadow: 0 0 0 8px color-mix(in srgb, var(--c) 25%, transparent);
+	}
+	.mode {
+		font-size: 13px;
+		padding: 4px 10px;
+		border: 1px solid #2a3346;
+		border-radius: 999px;
+	}
+	.mode.active {
+		border-color: var(--c);
+		color: var(--c);
 	}
 	.ear {
 		display: inline-flex;
