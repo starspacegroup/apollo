@@ -43,6 +43,16 @@
 	let seats = $state<string[]>([]);
 	/** The team's own on/off for the project, behind a toggle so the call's switches stay simple. */
 	let teamMode = $state(false);
+	/**
+	 * The room the call is in: the project's own, or one of its channels (David, 2026-10-14: *"in
+	 * the activity we should be able to select which channel we are in which changes which agents
+	 * are active automatically, and we can from there add/remove agents in that channel"*). Home
+	 * keeps it; picking a channel seats its members, and in a channel the owner's switch is that
+	 * channel's membership.
+	 */
+	let callRoom = $state<string>('');
+	/** A channel's members as home last said them, ahead of the next snapshot. */
+	let memberEdits = $state<Record<string, string[]>>({});
 
 	const project = $derived(data.project);
 	const inDiscord = getSdk() !== null;
@@ -57,6 +67,17 @@
 			(board?.rooms ?? []).find((r) => r.project === project) ??
 			null
 	);
+	/** The project's room first, then its channels. */
+	const channels: RoomView[] = $derived(
+		(board?.rooms ?? [])
+			.filter((r) => r.project === project)
+			.sort((a, b) => (a.channel === null ? -1 : b.channel === null ? 1 : a.room.localeCompare(b.room)))
+	);
+	const here: RoomView | null = $derived(channels.find((r) => r.room === (callRoom || project)) ?? room);
+	const inChannel = $derived(!!here?.channel);
+	function membersOf(r: RoomView): string[] {
+		return memberEdits[r.room] ?? r.team.map((m) => m.handle.toLowerCase());
+	}
 	const level = $derived(board?.viewer?.projects[project] ?? 'none');
 	const owner = $derived(board?.viewer?.role === 'owner' || board?.viewer?.role === 'admin');
 	const manager = $derived(owner || level === 'manager');
@@ -99,6 +120,14 @@
 			}
 			board = (await r.json()) as Board;
 			error = null;
+			// A channel's edit stands until the snapshot says the same.
+			const kept: Record<string, string[]> = {};
+			for (const [k, v] of Object.entries(memberEdits)) {
+				const r = (board.rooms ?? []).find((x) => x.room === k);
+				const has = (r?.team ?? []).map((m) => m.handle.toLowerCase()).sort().join(',');
+				if (has !== [...v].sort().join(',')) kept[k] = v;
+			}
+			memberEdits = kept;
 			// A switch is pending until the snapshot agrees with it.
 			if (flipping.size) {
 				const on = new Set(room?.team.map((m) => m.handle) ?? []);
@@ -124,6 +153,34 @@
 		const h = m.handle.toLowerCase();
 		seats = on ? [...seats.filter((x) => x !== h), h] : seats.filter((x) => x !== h);
 		sock.send(JSON.stringify({ t: 'seat', handle: m.handle, name: nameOf(m), on }));
+	}
+
+	/** Move the call to a room. Home answers with `channel` and the seats. */
+	function pick(r: RoomView) {
+		if (!sock || sock.readyState !== WebSocket.OPEN) {
+			note = 'Not connected to the machine yet.';
+			return;
+		}
+		note = null;
+		callRoom = r.room;
+		sock.send(
+			JSON.stringify({
+				t: 'channel',
+				room: r.room,
+				seats: r.team.map((m) => ({ handle: m.handle, name: nameOf(m) }))
+			})
+		);
+	}
+
+	/** Add an agent to the channel the call is in, or take it out. The owner's; the seats follow. */
+	function enlist(m: Member, on: boolean) {
+		if (!here?.channel || !sock || sock.readyState !== WebSocket.OPEN) return;
+		note = null;
+		const h = m.handle.toLowerCase();
+		const now = membersOf(here).filter((x) => x !== h);
+		memberEdits = { ...memberEdits, [here.room]: on ? [...now, h] : now };
+		seats = on ? [...seats.filter((x) => x !== h), h] : seats.filter((x) => x !== h);
+		sock.send(JSON.stringify({ t: 'member', room: here.room, handle: m.handle, name: nameOf(m), on }));
 	}
 
 	async function flip(m: Member, on: boolean) {
@@ -202,6 +259,13 @@
 				if (typeof m.note === 'string') note = m.note;
 				// Apollo in the voice channel says who is speaking as it happens.
 				if ('speaking' in m) speaking = typeof m.speaking === 'string' ? m.speaking : null;
+				break;
+			case 'channel':
+				if (typeof m.room === 'string') callRoom = m.room;
+				break;
+			case 'members':
+				if (typeof m.room === 'string' && Array.isArray(m.members))
+					memberEdits = { ...memberEdits, [m.room]: (m.members as unknown[]).map((x) => String(x).toLowerCase()) };
 				break;
 			case 'seats':
 				seats = Array.isArray(m.seats)
@@ -440,6 +504,20 @@
 			{home ? (thinking ? 'thinking' : speaking ? 'speaking' : 'listening') : 'away'}
 		</span>
 	</header>
+	{#if !teamMode && channels.length > 1}
+		<nav class="rooms" aria-label="Channel">
+			{#each channels as r (r.room)}
+				<button
+					class="chip"
+					class:active={(here?.room ?? project) === r.room}
+					onclick={() => pick(r)}
+					disabled={!home || (here?.room ?? project) === r.room}
+					title={r.channel ? `Talk in #${r.channel}: its members join the call` : `Talk in ${project}'s own room`}
+					>#{r.channel ?? 'general'}{#if r.channel}<small>{membersOf(r).length}</small>{/if}</button
+				>
+			{/each}
+		</nav>
+	{/if}
 
 	{#if error}
 		<p class="bad center">{error}</p>
@@ -454,6 +532,7 @@
 					{#each room.team as m (m.handle)}
 						{@const inCall = seats.includes(m.handle.toLowerCase())}
 						{@const s = stateOf(m, inCall)}
+						{@const edits = inChannel && owner}
 						<div class="agent {s}" class:seated={inCall}>
 							<span class="face">
 								{#if m.face}<img src={`/api/face/${m.face}`} alt="" loading="lazy" />{:else}<i
@@ -466,9 +545,15 @@
 								<button
 									class="switch"
 									class:on={inCall}
-									onclick={() => seat(m, !inCall)}
+									onclick={() => (edits ? enlist(m, !inCall) : seat(m, !inCall))}
 									disabled={!home}
-									title={inCall ? `Send ${nameOf(m)} out of the call` : `Bring ${nameOf(m)} into the call`}
+									title={edits
+										? inCall
+											? `Take ${nameOf(m)} out of #${here?.channel}`
+											: `Add ${nameOf(m)} to #${here?.channel}`
+										: inCall
+											? `Send ${nameOf(m)} out of the call`
+											: `Bring ${nameOf(m)} into the call`}
 									aria-pressed={inCall}
 									aria-label={inCall ? `${nameOf(m)} out of the call` : `${nameOf(m)} into the call`}
 									><span></span></button
@@ -535,7 +620,7 @@
 				{/key}
 			{:else}
 				<p class="caption dim">
-					{#if !home}The machine is away; your words will wait.{:else if seats.length === 0}Switch an agent into the call to talk to it, or
+					{#if !home}The machine is away; your words will wait.{:else if seats.length === 0 && inChannel}Nobody is in #{here?.channel}. {#if owner}Switch an agent on to add it to the channel.{:else}Switch an agent into the call, or say "Apollo".{/if}{:else if seats.length === 0}Switch an agent into the call to talk to it, or
 						say "Apollo".{:else if live}Apollo is in the
 						voice channel with you. Just talk.{:else if inDiscord && member}Join the project's
 						voice channel and talk; Apollo follows you in.{:else if member}Tap the mic and
@@ -840,6 +925,41 @@
 	.mode.active {
 		border-color: var(--c);
 		color: var(--c);
+	}
+	/* The channel the call is in: one row, scrolled sideways on a phone rather than wrapped. */
+	.rooms {
+		display: flex;
+		gap: 6px;
+		padding: 2px 14px 8px;
+		overflow-x: auto;
+		scrollbar-width: none;
+	}
+	.chip {
+		flex: none;
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		font: inherit;
+		font-size: 13px;
+		padding: 5px 12px;
+		border: 1px solid #2a3346;
+		border-radius: 999px;
+		background: transparent;
+		color: inherit;
+		cursor: pointer;
+	}
+	.chip small {
+		opacity: 0.6;
+		font-size: 11px;
+	}
+	.chip.active {
+		border-color: var(--c);
+		color: var(--c);
+		background: color-mix(in srgb, var(--c) 12%, transparent);
+		cursor: default;
+	}
+	.chip:disabled:not(.active) {
+		opacity: 0.5;
 	}
 	.ear {
 		display: inline-flex;

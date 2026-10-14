@@ -90,18 +90,31 @@ export class VoiceRelay extends DurableObject<Env> {
 			ws.send(JSON.stringify({ t: 'pong', home: this.home() !== null }));
 			return;
 		}
-		if (msg.t === 'utter' || msg.t === 'say' || msg.t === 'seat') {
+		if (msg.t === 'utter' || msg.t === 'say' || msg.t === 'seat' || msg.t === 'channel' || msg.t === 'member') {
+			const seat = () => ({
+				handle: String(msg.handle ?? '').slice(0, 64),
+				name: String(msg.name ?? '').slice(0, 64),
+				on: msg.on === true
+			});
 			const body =
 				msg.t === 'utter'
 					? { audio: msg.audio, mime: msg.mime }
 					: msg.t === 'say'
 						? { text: msg.text }
-						: // An agent into or out of the call (`apollo-voice` keeps the seats).
-							{
-								handle: String(msg.handle ?? '').slice(0, 64),
-								name: String(msg.name ?? '').slice(0, 64),
-								on: msg.on === true
-							};
+						: msg.t === 'channel'
+							? // The channel the call is in; home checks it is this project's.
+								{
+									room: String(msg.room ?? '').slice(0, 160),
+									seats: (Array.isArray(msg.seats) ? msg.seats : []).slice(0, 40).map((x: unknown) => {
+										const o = (x ?? {}) as Record<string, unknown>;
+										return { handle: String(o.handle ?? '').slice(0, 64), name: String(o.name ?? '').slice(0, 64) };
+									})
+								}
+							: msg.t === 'member'
+								? // An agent into or out of a channel; home lets only the owner.
+									{ room: String(msg.room ?? '').slice(0, 160), ...seat() }
+								: // An agent into or out of the call (`apollo-voice` keeps the seats).
+									seat();
 			const stamped = {
 				t: msg.t,
 				project: att.project,

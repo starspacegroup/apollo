@@ -143,6 +143,14 @@ most, and any person speaking ends it. Each agent has a voice nobody else
 has, kept in `voices.json`. The project's own on/off and the bench sit
 behind **Team** in the header, for managers. When Apollo joins a channel it posts an Activity link in the channel's chat (a card with Play), so one tap opens the panel there, and its spoken intro says what to do.
 
+**The call's channel.** A row of chips under the header picks the room the
+call is in: `#general` (the project's own room) or one of its channels. Picking
+a channel seats that channel's members; going back to `#general` brings back
+the seats it had. In a channel the owner's switch adds an agent to the channel
+or takes it out, and the seats follow; anyone else's switch only seats. Spoken
+and typed lines go to that room, and the answers are read from it. The channel
+resets to `#general` when the call ends.
+
 The fuller controls — proposals, runs, pause, cap, the transcript — stay on
 the hosted board. The daemon polls for intents every ten seconds; the relay
 is live.
