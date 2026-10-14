@@ -67,14 +67,21 @@
 			(board?.rooms ?? []).find((r) => r.project === project) ??
 			null
 	);
+	/** A channel's own name — `planning` for `Apollo#planning` — or null for
+	 * the project's room. `RoomView.channel` is the Discord channel's id, not
+	 * its name, and the chips showed the ids (2026-10-14). */
+	function sub(r: RoomView | null): string | null {
+		const i = r?.room.indexOf('#') ?? -1;
+		return r && i >= 0 ? r.room.slice(i + 1) : null;
+	}
 	/** The project's room first, then its channels. */
 	const channels: RoomView[] = $derived(
 		(board?.rooms ?? [])
 			.filter((r) => r.project === project)
-			.sort((a, b) => (a.channel === null ? -1 : b.channel === null ? 1 : a.room.localeCompare(b.room)))
+			.sort((a, b) => (sub(a) === null ? -1 : sub(b) === null ? 1 : a.room.localeCompare(b.room)))
 	);
 	const here: RoomView | null = $derived(channels.find((r) => r.room === (callRoom || project)) ?? room);
-	const inChannel = $derived(!!here?.channel);
+	const inChannel = $derived(!!sub(here));
 	function membersOf(r: RoomView): string[] {
 		return memberEdits[r.room] ?? r.team.map((m) => m.handle.toLowerCase());
 	}
@@ -174,7 +181,7 @@
 
 	/** Add an agent to the channel the call is in, or take it out. The owner's; the seats follow. */
 	function enlist(m: Member, on: boolean) {
-		if (!here?.channel || !sock || sock.readyState !== WebSocket.OPEN) return;
+		if (!here || !sub(here) || !sock || sock.readyState !== WebSocket.OPEN) return;
 		note = null;
 		const h = m.handle.toLowerCase();
 		const now = membersOf(here).filter((x) => x !== h);
@@ -512,8 +519,8 @@
 					class:active={(here?.room ?? project) === r.room}
 					onclick={() => pick(r)}
 					disabled={!home || (here?.room ?? project) === r.room}
-					title={r.channel ? `Talk in #${r.channel}: its members join the call` : `Talk in ${project}'s own room`}
-					>#{r.channel ?? 'general'}{#if r.channel}<small>{membersOf(r).length}</small>{/if}</button
+					title={sub(r) ? `Talk in #${sub(r)}: its members join the call` : `Talk in ${project}'s own room`}
+					>#{sub(r) ?? 'general'}{#if sub(r)}<small>{membersOf(r).length}</small>{/if}</button
 				>
 			{/each}
 		</nav>
@@ -549,8 +556,8 @@
 									disabled={!home}
 									title={edits
 										? inCall
-											? `Take ${nameOf(m)} out of #${here?.channel}`
-											: `Add ${nameOf(m)} to #${here?.channel}`
+											? `Take ${nameOf(m)} out of #${sub(here)}`
+											: `Add ${nameOf(m)} to #${sub(here)}`
 										: inCall
 											? `Send ${nameOf(m)} out of the call`
 											: `Bring ${nameOf(m)} into the call`}
@@ -620,7 +627,7 @@
 				{/key}
 			{:else}
 				<p class="caption dim">
-					{#if !home}The machine is away; your words will wait.{:else if seats.length === 0 && inChannel}Nobody is in #{here?.channel}. {#if owner}Switch an agent on to add it to the channel.{:else}Switch an agent into the call, or say "Apollo".{/if}{:else if seats.length === 0}Switch an agent into the call to talk to it, or
+					{#if !home}The machine is away; your words will wait.{:else if seats.length === 0 && inChannel}Nobody is in #{sub(here)}. {#if owner}Switch an agent on to add it to the channel.{:else}Switch an agent into the call, or say "Apollo".{/if}{:else if seats.length === 0}Switch an agent into the call to talk to it, or
 						say "Apollo".{:else if live}Apollo is in the
 						voice channel with you. Just talk.{:else if inDiscord && member}Join the project's
 						voice channel and talk; Apollo follows you in.{:else if member}Tap the mic and
