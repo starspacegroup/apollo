@@ -44,6 +44,17 @@ neither supersedes the other.
 
 - `schema.sql` — users, chat sessions, chat messages. The conversation half.
 - `migrations/0001_register.sql` — snapshots and intents. The board half.
+- `migrations/0002_access.sql` — members and grants.
+- `migrations/0003_snapshot_trail.sql` — the index the snapshot trail's
+  retention uses. Apply it after 0001.
+
+The snapshot trail keeps counts on every push but the whole board at most once
+an hour, and blanks bodies older than seven days (`body = ''`). Before
+2026-10-15 every push stored its full body (600-800 KB, once a minute); the
+database reached D1's 10 GB ceiling on 2026-10-12 and every push returned 500
+with `D1_ERROR: Exceeded maximum DB size`. The existing rows were thinned to the
+same rule by hand that day. A trail write that fails now does not fail the
+push: KV already has the current board, and the reply carries `trail_error`.
 
 Local:
 
