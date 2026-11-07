@@ -127,6 +127,19 @@ export function mayAsk(
 			if (!project) return `${kind} for the whole fleet is the owner's`;
 			if (!atLeast(level, 'manager')) return `you do not manage ${project}`;
 			return null;
+		case 'room.say':
+			if (!project) return 'a line names its project';
+			if (!atLeast(level, 'member')) return `you are not a member of ${project}`;
+			return null;
+		case 'character.on':
+			return `putting somebody on ${project || 'a project'} is the owner's`;
+		case 'character.off':
+		case 'proposal.approve':
+		case 'proposal.reject':
+		case 'run.stop':
+			if (!project) return `${kind} names a project`;
+			if (!atLeast(level, 'manager')) return `you do not manage ${project}`;
+			return null;
 		case 'attention.resolve':
 			// The item's project is not in the payload; the machine checks the
 			// id. A guest with nothing to manage has nothing to resolve.
@@ -174,6 +187,14 @@ export function visibleBoard(board: Board, viewer: Viewer): Board {
 	}
 	return {
 		...board,
+		// The Live page is the owner's: run transcripts, every project's feed.
+		live: undefined,
+		usage: undefined,
+		rooms: board.rooms?.filter((r) => allowed.has(r.project)),
+		discord: board.discord
+			? { channels: board.discord.channels.filter((c) => allowed.has(c.project)) }
+			: undefined,
+		voice: board.voice && allowed.has(board.voice.project) ? board.voice : undefined,
 		projects: board.projects.filter((p) => allowed.has(p.name)),
 		actors: board.actors.filter((a) => {
 			const home = (a as { home?: string }).home ?? '';
@@ -328,4 +349,46 @@ export function viewerOf(member: Member, grants: Grant[], board: Board): Viewer 
 			'*'
 		)
 	};
+}
+
+/** Paths the owner gate leaves open: the ticket's landing, the build's
+ * static files, and the daemon's own token-checked `/api/link/*`. */
+export const OPEN_PATHS = [
+	'/auth/sso',
+	'/api/link/',
+	'/_app/',
+	'/favicon',
+	'/robots.txt',
+	// The Discord Activity's door: the page that runs the handshake and the
+	// endpoint that spends its code. Both are how a person gets a pass, not
+	// anything a pass protects.
+	'/activity',
+	'/api/activity/'
+];
+
+/**
+ * Whether a request is Discord opening the Activity. Discord loads the
+ * mapped root with its frame and instance ids in the query; nothing else
+ * arrives at `/` carrying a `frame_id`. The owner gate sends such a request
+ * to the Activity's door before it can send it to the hub's login, which a
+ * sandboxed iframe could never show.
+ */
+export function isActivityLaunch(url: URL): boolean {
+	return url.pathname === '/' && url.searchParams.has('frame_id');
+}
+
+/**
+ * The owner gate's decision for one request (`hooks.server.ts`): `open` for
+ * a path nobody needs to sign in for, `pass` for the owner, `login` for
+ * somebody signed out of a page, `unauthorized` for somebody signed out of
+ * an API, `deny` for anybody else. No owner named means nobody passes.
+ */
+export function gate(
+	path: string,
+	id: string | null,
+	owners: string[]
+): 'open' | 'pass' | 'login' | 'unauthorized' | 'deny' {
+	if (OPEN_PATHS.some((o) => path === o || path.startsWith(o))) return 'open';
+	if (!id) return path.startsWith('/api/') ? 'unauthorized' : 'login';
+	return owners.includes(id) ? 'pass' : 'deny';
 }

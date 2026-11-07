@@ -81,6 +81,80 @@ the Discord developer portal with `https://<worker>/auth/callback/discord` as a
 redirect), `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET` for the repository chat,
 and `APOLLO_LINK_TOKEN` for the daemon. Tables: `migrations/0002_access.sql`.
 
+## Inside Discord
+
+Since 2026-10-10 the Live screen is also a **Discord Activity** on the Apollo
+server. Discord opens the app in an iframe at `<app id>.discordsays.com`, and
+its proxy forwards that to `apollo.starspace.group` through the URL mapping
+`/` → `apollo.starspace.group` on the application's **Activities** page. The
+hub's login cannot run in that sandbox, so the Activity has a door of its own:
+Discord lands on `/`, carrying a `frame_id`, and is sent to `/activity`,
+where the Embedded App SDK asks Discord for a code; `POST /api/activity/token`
+spends it with `DISCORD_CLIENT_SECRET`, asks Discord who the token belongs to,
+and issues the same pass cookie the hub's ticket does — `SameSite=None` and
+`Partitioned`, so it lives only inside Discord's frames. Then the project's page.
+
+Since 2026-10-12 the Activity is **just the agents** (David: _"the activity
+interface to just be the agents, I should be able to turn them off and on,
+mobile first responsive, and I should be able to talk to them over voice
+chat through the activity"_). Opened in any of a project's channels — its
+text channels or its `<tag>-voice` — it opens on that project: a grid of
+faces, the team first and the bench after, each lit when **speaking**,
+**thinking** or **working**, greyed when off, with a switch beside it; and
+one mic. Opened anywhere that is no project's channel, it asks which project.
+
+**The switch.** Off is `character.off` on the wire, a manager's or the
+owner's; on is `character.on`, the owner's alone — the one raise the wire
+carries, and the daemon checks the asking account by id before it puts
+anybody on. The snapshot's rooms carry a `bench` beside the `team` so the
+page knows who it could put on.
+
+**The voice.** Tap the mic and the page listens: it watches the level, cuts
+an utterance at nine hundred milliseconds of quiet, and sends it whole over
+a WebSocket to the **voice relay**, a Durable Object (`src/lib/server/relay.ts`)
+that holds every viewer's socket and one socket from home. Home is
+`apollo-voice` (the daemon repository's `voice/`): it hears the recording
+with whisper, says it into the project's room as the viewer's own line
+(`apollo say --voice`, which tells the team to answer as one speaks), and
+reads the room's answers back to every viewer of the project as text and as
+ogg, one voice per character; the page plays them in turn with the speaking
+face lit, and speech over the team's voice stops it. A viewer reaches the
+relay with a two-minute ticket signed with `AUTH_SECRET`, issued by
+`POST /api/activity/voice/ticket` only for a project they may speak in;
+home carries the link token. The upgrade is answered in `worker/index.ts`
+before SvelteKit, because a Durable Object's 101 has immutable headers and
+SvelteKit's cookie pass throws on them — which is also why the adapter is
+pointed at `wrangler.build.jsonc` and the real `wrangler.jsonc` names the
+entry that exports the Durable Object. The same process also sits in the
+project's Discord voice channel when a person is there, hearing each one on
+their own stream and answering aloud there too.
+
+**The call.** Inside Discord the frame never gets the microphone (Discord's
+Activity iframe carries no microphone policy), so there the voice is the
+voice channel: Apollo joins it, everyone in it hears each other and the
+team as one call, and the page stays quiet while Apollo is in the channel
+so no line is heard twice. Each face's switch seats that agent in the call;
+all are off until somebody switches one in, and the seats clear when the
+call empties. Only the seated answer a spoken line — the one named aloud,
+or the only one seated, or the router's choice among them; with nobody
+seated, only "Apollo" gets an answer. The seated may answer each other
+afterwards (named by the last speaker, or judged needed), three turns at
+most, and any person speaking ends it. Each agent has a voice nobody else
+has, kept in `voices.json`. The project's own on/off and the bench sit
+behind **Team** in the header, for managers. When Apollo joins a channel it posts an Activity link in the channel's chat (a card with Play), so one tap opens the panel there, and its spoken intro says what to do.
+
+**The call's channel.** A row of chips under the header picks the room the
+call is in: `#general` (the project's own room) or one of its channels. Picking
+a channel seats that channel's members; going back to `#general` brings back
+the seats it had. In a channel the owner's switch adds an agent to the channel
+or takes it out, and the seats follow; anyone else's switch only seats. Spoken
+and typed lines go to that room, and the answers are read from it. The channel
+resets to `#general` when the call ends.
+
+The fuller controls — proposals, runs, pause, cap, the transcript — stay on
+the hosted board. The daemon polls for intents every ten seconds; the relay
+is live.
+
 ## Docs
 
 - [`docs/setup.md`](docs/setup.md) — secrets, OAuth, D1, KV, deploying

@@ -23,7 +23,7 @@
 			const currentSession = sessionStore.getCurrentSession();
 			if (!currentSession) {
 				// Session doesn't exist, redirect to home
-				goto('/');
+				goto('/chat');
 			} else {
 				// Set repository from session
 				currentRepository = currentSession.repository;
@@ -60,7 +60,7 @@
 			<h1>Apollo</h1>
 			<p class="subtitle">AI-Powered GitHub Assistant</p>
 			<p class="description">Please sign in to continue.</p>
-			<button class="login-button" onclick={() => goto('/')}> Go to Home </button>
+			<button class="login-button" onclick={() => goto('/chat')}> Go to Home </button>
 		</div>
 	</div>
 {/if}

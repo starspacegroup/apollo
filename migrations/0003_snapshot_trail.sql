@@ -1,0 +1,16 @@
+-- The trail keeps counts every push and the whole board once an hour.
+--
+-- 2026-10-15: every push used to store its full body (600-800 KB by October)
+-- in `snapshots.body`, once a minute. That is about 1 GB a day, and on
+-- 2026-10-12 21:21 EDT the database reached D1's 10 GB ceiling. From then on
+-- every INSERT failed with "Exceeded maximum DB size" and every push returned
+-- 500, although the KV write before it had already succeeded.
+--
+-- Now a row keeps its body only when no body has been kept in the last hour,
+-- and bodies older than seven days are blanked. A row with no body has
+-- body = '' (the column stays NOT NULL, so older readers see a string). The
+-- counts stay on every row, forever — about 100 bytes each.
+--
+-- This partial index makes both of those checks a few rows, not a scan of the
+-- whole trail.
+CREATE INDEX IF NOT EXISTS snapshots_bodies ON snapshots(received_at) WHERE body != '';

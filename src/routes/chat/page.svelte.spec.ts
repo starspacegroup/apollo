@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import Page from './+page.svelte';
 
-describe('/+page.svelte', () => {
+describe('/chat/+page.svelte', () => {
 	it('should render h1', async () => {
 		render(Page, { data: { session: null } });
 

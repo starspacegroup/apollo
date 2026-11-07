@@ -198,7 +198,7 @@
 		if (navId === 'chat') {
 			// Navigate to root for new chat and clear current session
 			sessionStore.clearCurrentSession();
-			goto('/');
+			goto('/chat');
 
 			// Close sidebar on mobile after navigation
 			if (window.innerWidth <= 480) {
@@ -207,7 +207,7 @@
 		} else if (navId === 'voice') {
 			// Navigate to root and activate voice mode
 			sessionStore.clearCurrentSession();
-			goto('/');
+			goto('/chat');
 			onStartVoice();
 
 			// Close sidebar on mobile after navigation

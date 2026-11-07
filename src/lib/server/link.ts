@@ -85,7 +85,19 @@ export const ALLOWED_INTENTS = [
 	'autonomy.lower',
 	// A team named from among who is on a project now. The local half refuses
 	// one that would put somebody on, and `team.clear` by name.
-	'team.set'
+	'team.set',
+	// The Activity (2026-10-12): a line said in a room, a proposal answered,
+	// a run stopped. Saying is asking; answering a proposal is the owner's or
+	// a manager's; stopping is reducing. Nothing here starts anything.
+	'room.say',
+	'proposal.approve',
+	'proposal.reject',
+	'run.stop',
+	// One character on or off on one project — the switch beside each face
+	// in the Activity. Off narrows; on is the owner's alone, and the local
+	// half checks that by account id (apollod link.rs).
+	'character.off',
+	'character.on'
 ] as const;
 export type IntentKind = (typeof ALLOWED_INTENTS)[number];
 

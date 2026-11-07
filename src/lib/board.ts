@@ -7,7 +7,7 @@
  * because two hand-written definitions drift. Until then `schema` is the guard:
  * the page checks it and says so rather than rendering a shape it half knows.
  */
-export const SCHEMA = 4;
+export const SCHEMA = 6;
 
 export interface Meters {
 	five_hour: number;
@@ -248,7 +248,148 @@ export interface Board {
 	caveats: string[];
 	/** Who is reading, and what they may see and do. Set by the Worker, per request. */
 	viewer?: Viewer;
+	/** What the team is doing, as it happens. Schema 5; the owner's alone. */
+	live?: LiveView;
+	/** Claude and the local models, as series. Schema 6; the owner's alone. */
+	usage?: Usage;
+	/** The rooms, their teams, lines and what waits — the Activity's data. */
+	rooms?: RoomView[];
+	/** Which Discord channel is which project. */
+	discord?: DiscordMap;
+	/** Apollo in a voice channel right now, as apollo-voice last wrote it. Absent when it is nowhere. */
+	voice?: VoiceView;
 }
+
+/** Where Apollo is listening and speaking (apollod `voice/`, 2026-10-12). */
+export interface VoiceView {
+	channel: string;
+	project: string;
+	since: number;
+	people: { id: string; name: string }[];
+	/** Discord ids being heard right now. */
+	hearing: string[];
+	/** The handle whose line is being read aloud, or null. */
+	speaking: string | null;
+	/** A spoken line went to the team and nothing has come back yet. */
+	thinking: boolean;
+	heard: { who: string; text: string; at: number }[];
+	updated: number;
+}
+
+export interface Usage {
+	windows: { at: string; five_hour: number; weekly: number; scoped: number }[];
+	tokens_by_model: { day: string; model: string; tokens: number }[];
+	ollama: { hour: string; count: number; seconds: number }[];
+	whisper: { hour: string; count: number; seconds: number }[];
+}
+
+/** A room as the Activity shows it (`apollo_index::board::RoomView`). */
+export interface RoomView {
+	room: string;
+	project: string;
+	channel: string | null;
+	team: Member[];
+	/** Who could be on the project and is not: the switches that put somebody on. */
+	bench?: Member[];
+	/** Oldest first. */
+	lines: Line[];
+	proposals: ProposalView[];
+	runs: RunView[];
+}
+
+export interface Member {
+	handle: string;
+	name: string;
+	tag: string;
+	purpose: string;
+	/** `GET /api/face/<face>` on this Worker, or none. */
+	face: string | null;
+}
+
+export interface Line {
+	id: number;
+	at: string;
+	who: string;
+	name: string;
+	tag: string | null;
+	kind: string;
+	provenance: string;
+	text: string;
+	reference: string | null;
+	files: { id: number; name: string; mime: string; bytes: number }[];
+}
+
+export interface ProposalView {
+	id: number;
+	at: string;
+	character: string;
+	name: string;
+	note: string;
+}
+
+export interface RunView {
+	id: string;
+	character: string;
+	name: string;
+	state: 'running' | 'finished' | 'failed' | 'stopped';
+	started_at: string;
+	ended_at: string | null;
+	prompt: string;
+	branch: string | null;
+}
+
+export interface DiscordMap {
+	channels: { id: string; project: string; room: string | null; kind: 'text' | 'voice' }[];
+}
+
+/** The Live page's data (`apollo_index::board::LiveView`). */
+export interface LiveView {
+	working: LiveRun[];
+	feed: LiveEvent[];
+	lanes: LiveLane[];
+	per_minute: number;
+	tokens_hour: number;
+}
+
+export interface LiveRun {
+	id: string;
+	handle: string;
+	name: string;
+	role: string;
+	project: string;
+	model: string | null;
+	brief: string;
+	started_at: string;
+	doing: string;
+	phase: number;
+	writes: boolean;
+	quiet_seconds: number;
+	tokens: number;
+	branch: string | null;
+	steps: { at: string; kind: string; what: string; failed: boolean }[];
+	files: [string, number][];
+}
+
+export interface LiveEvent {
+	at: string;
+	who: string;
+	project: string;
+	what: string;
+}
+
+export interface LiveLane {
+	who: string;
+	segments: {
+		project: string;
+		start: string;
+		end: string | null;
+		label: string;
+		outcome: string | null;
+	}[];
+}
+
+/** The phase track, in order — `apollo_index::live::PHASES`. */
+export const PHASES = ['Read the brief', 'Read the code', 'Edit', 'Test', 'Commit', 'Push'];
 
 /** The person the board was filtered for. */
 export interface Viewer {
