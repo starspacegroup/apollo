@@ -84,6 +84,12 @@ export class VoiceRelay extends DurableObject<Env> {
 		}
 		const att = ws.deserializeAttachment() as (Viewer & { home?: undefined }) | { home: true };
 		if ('home' in att && att.home) {
+			// Home's heartbeat: a socket a deploy left half-open looks alive
+			// from home's side and never closes, and the switches stay grey.
+			if (msg.t === 'ping') {
+				ws.send(JSON.stringify({ t: 'pong' }));
+				return;
+			}
 			// home → the viewers of one project
 			if (msg.t === 'to' && typeof msg.project === 'string' && msg.msg) {
 				const out = JSON.stringify(msg.msg);

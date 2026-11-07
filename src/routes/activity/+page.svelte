@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { api, setPass, setSdk } from '$lib/activity';
+	import { api, rememberLaunch, setPass, setSdk } from '$lib/activity';
 	import { landing } from '$lib/launch';
 	import type { Board } from '$lib/board';
 	import type { PageData } from './$types';
@@ -36,6 +36,7 @@
 			failed = 'This page only opens inside Discord, as the Apollo activity.';
 			return;
 		}
+		rememberLaunch(location.search);
 		if (!data.clientId) {
 			failed = 'The Worker does not know its Discord application id.';
 			return;
@@ -89,6 +90,12 @@
 				return;
 			}
 			const board = (await b.json()) as Board;
+			// Back from a reload into a new build: the page that was open.
+			const back = new URLSearchParams(location.search).get('to');
+			if (back && back.startsWith('/activity/')) {
+				await goto(back);
+				return;
+			}
 			// The channel names the project; failing that, the link Apollo posts in a call carries it
 			// (`custom_id`, from apollo-voice's card).
 			const named = sdk.customId

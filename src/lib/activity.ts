@@ -25,10 +25,86 @@ export function getSdk(): DiscordSDK | null {
  * board answered 401 straight after a good sign-in. Every API call from the
  * Activity goes through `api()`, which carries the pass as a bearer header.
  */
-let pass: string | null = null;
+// Kept in sessionStorage as well, which lives inside the iframe where a
+// third-party cookie does not, so a reload after a deploy is still signed in.
+const PASS_KEY = 'apollo.activity.pass';
+const LAUNCH_KEY = 'apollo.activity.launch';
+
+function stored(key: string): string | null {
+	try {
+		return typeof sessionStorage === 'undefined' ? null : sessionStorage.getItem(key);
+	} catch {
+		return null;
+	}
+}
+function store(key: string, value: string | null) {
+	try {
+		if (value === null) sessionStorage.removeItem(key);
+		else sessionStorage.setItem(key, value);
+	} catch {
+		/* storage blocked: memory only */
+	}
+}
+
+let pass: string | null = stored(PASS_KEY);
 
 export function setPass(p: string | null | undefined) {
 	pass = p ?? null;
+	store(PASS_KEY, pass);
+}
+
+/** The query Discord launched the Activity with (`frame_id`, `instance_id`, …), which the SDK needs again after a reload. */
+export function rememberLaunch(search: string) {
+	const q = new URLSearchParams(search);
+	q.delete('to');
+	if (q.has('frame_id') && q.get('frame_id') !== 'kept') store(LAUNCH_KEY, q.toString());
+}
+
+/**
+ * Reload into a new build without losing the place: back through the door,
+ * which re-runs the SDK handshake (silent after the first consent) and then
+ * goes to `to` — the page that was open.
+ */
+export function reloadInPlace() {
+	const q = new URLSearchParams(stored(LAUNCH_KEY) ?? location.search);
+	q.delete('to');
+	if (location.pathname !== '/activity') q.set('to', location.pathname + location.search);
+	location.replace(`/activity?${q.toString()}`);
+}
+
+/**
+ * `<img use:face={key}>`: a face is behind the owner gate (some are pictures
+ * David chose), and an `<img src>` can carry neither the header nor, inside
+ * Discord, the cookie. So the bytes come through `api()` and the image is
+ * shown from a blob URL, cached for the page's life.
+ */
+const faces = new Map<string, Promise<string | null>>();
+function faceUrl(key: string): Promise<string | null> {
+	let u = faces.get(key);
+	if (!u) {
+		u = api(`/api/face/${encodeURIComponent(key)}`)
+			.then(async (r) => (r.ok ? URL.createObjectURL(await r.blob()) : null))
+			.catch(() => null);
+		faces.set(key, u);
+		void u.then((v) => {
+			if (!v) faces.delete(key);
+		});
+	}
+	return u;
+}
+export function face(img: HTMLImageElement, key: string) {
+	let current = key;
+	const load = (k: string) =>
+		void faceUrl(k).then((u) => {
+			if (u && current === k) img.src = u;
+		});
+	load(key);
+	return {
+		update(k: string) {
+			current = k;
+			load(k);
+		}
+	};
 }
 
 export function api(input: string, init: RequestInit = {}): Promise<Response> {

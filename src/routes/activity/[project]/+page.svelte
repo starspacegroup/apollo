@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { brandOf, type Board, type Member, type RoomView } from '$lib/board';
-	import { api, getSdk } from '$lib/activity';
+	import { api, face, getSdk } from '$lib/activity';
 	import type { PageData } from './$types';
 
 	/**
@@ -556,8 +556,7 @@
 						{@const edits = inChannel && owner}
 						<div class="agent {s}" class:seated={inCall}>
 							<span class="face">
-								{#if m.face}<img src={`/api/face/${m.face}`} alt="" loading="lazy" />{:else}<i
-										>{nameOf(m).slice(0, 1)}</i
+								{#if m.face}<img use:face={m.face} alt="" />{:else}<i>{nameOf(m).slice(0, 1)}</i
 									>{/if}
 							</span>
 							<b>{nameOf(m)}</b>
@@ -593,8 +592,7 @@
 						{@const s = stateOf(m, true)}
 						<div class="agent {s}" class:pending={flipping.has(`${m.handle}:off`)}>
 							<span class="face">
-								{#if m.face}<img src={`/api/face/${m.face}`} alt="" loading="lazy" />{:else}<i
-										>{nameOf(m).slice(0, 1)}</i
+								{#if m.face}<img use:face={m.face} alt="" />{:else}<i>{nameOf(m).slice(0, 1)}</i
 									>{/if}
 							</span>
 							<b>{nameOf(m)}</b>
@@ -613,8 +611,7 @@
 					{#each room.bench ?? [] as m (m.handle)}
 						<div class="agent off" class:pending={flipping.has(`${m.handle}:on`)}>
 							<span class="face">
-								{#if m.face}<img src={`/api/face/${m.face}`} alt="" loading="lazy" />{:else}<i
-										>{nameOf(m).slice(0, 1)}</i
+								{#if m.face}<img use:face={m.face} alt="" />{:else}<i>{nameOf(m).slice(0, 1)}</i
 									>{/if}
 							</span>
 							<b>{nameOf(m)}</b>
