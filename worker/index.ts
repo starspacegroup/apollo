@@ -19,6 +19,10 @@ export default {
 		if (new URL(req.url).pathname === RELAY_PATH) {
 			return env.VOICE_RELAY.get(env.VOICE_RELAY.idFromName('hub')).fetch(req);
 		}
-		return (app as { fetch(r: Request, e: Env, c: ExecutionContext): Promise<Response> }).fetch(req, env, ctx);
+		return (app as { fetch(r: Request, e: Env, c: ExecutionContext): Promise<Response> }).fetch(
+			req,
+			env,
+			ctx
+		);
 	}
 };

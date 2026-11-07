@@ -52,13 +52,25 @@ export class VoiceRelay extends DurableObject<Env> {
 			return new Response(null, { status: 101, webSocket: client });
 		}
 
-		const ticket = await readRelayTicket(url.searchParams.get('ticket') ?? '', this.env.AUTH_SECRET ?? '');
+		const ticket = await readRelayTicket(
+			url.searchParams.get('ticket') ?? '',
+			this.env.AUTH_SECRET ?? ''
+		);
 		if (!ticket) return new Response('no ticket', { status: 401 });
-		const v: Viewer = { project: ticket.project, id: ticket.id, name: ticket.name, provenance: ticket.provenance };
+		const v: Viewer = {
+			project: ticket.project,
+			id: ticket.id,
+			name: ticket.name,
+			provenance: ticket.provenance
+		};
 		this.ctx.acceptWebSocket(server, ['viewer', `p:${v.project}`]);
 		server.serializeAttachment(v);
 		server.send(JSON.stringify({ t: 'home', on: this.home() !== null }));
-		this.tellHome({ t: 'viewers', project: v.project, n: this.ctx.getWebSockets(`p:${v.project}`).length });
+		this.tellHome({
+			t: 'viewers',
+			project: v.project,
+			n: this.ctx.getWebSockets(`p:${v.project}`).length
+		});
 		return new Response(null, { status: 101, webSocket: client });
 	}
 
@@ -90,7 +102,13 @@ export class VoiceRelay extends DurableObject<Env> {
 			ws.send(JSON.stringify({ t: 'pong', home: this.home() !== null }));
 			return;
 		}
-		if (msg.t === 'utter' || msg.t === 'say' || msg.t === 'seat' || msg.t === 'channel' || msg.t === 'member') {
+		if (
+			msg.t === 'utter' ||
+			msg.t === 'say' ||
+			msg.t === 'seat' ||
+			msg.t === 'channel' ||
+			msg.t === 'member'
+		) {
 			const seat = () => ({
 				handle: String(msg.handle ?? '').slice(0, 64),
 				name: String(msg.name ?? '').slice(0, 64),
@@ -105,10 +123,15 @@ export class VoiceRelay extends DurableObject<Env> {
 							? // The channel the call is in; home checks it is this project's.
 								{
 									room: String(msg.room ?? '').slice(0, 160),
-									seats: (Array.isArray(msg.seats) ? msg.seats : []).slice(0, 40).map((x: unknown) => {
-										const o = (x ?? {}) as Record<string, unknown>;
-										return { handle: String(o.handle ?? '').slice(0, 64), name: String(o.name ?? '').slice(0, 64) };
-									})
+									seats: (Array.isArray(msg.seats) ? msg.seats : [])
+										.slice(0, 40)
+										.map((x: unknown) => {
+											const o = (x ?? {}) as Record<string, unknown>;
+											return {
+												handle: String(o.handle ?? '').slice(0, 64),
+												name: String(o.name ?? '').slice(0, 64)
+											};
+										})
 								}
 							: msg.t === 'member'
 								? // An agent into or out of a channel; home lets only the owner.
