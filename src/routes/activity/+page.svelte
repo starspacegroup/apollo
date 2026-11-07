@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { setSdk } from '$lib/activity';
+	import { api, setPass, setSdk } from '$lib/activity';
 	import { landing } from '$lib/launch';
 	import type { Board } from '$lib/board';
 	import type { PageData } from './$types';
@@ -69,7 +69,8 @@
 				failed = `Sign-in refused (${res.status}).`;
 				return;
 			}
-			const { access_token } = (await res.json()) as { access_token: string };
+			const { access_token, pass } = (await res.json()) as { access_token: string; pass?: string };
+			setPass(pass);
 			const auth = await sdk.commands.authenticate({ access_token });
 			if (!auth) {
 				failed = 'Discord did not confirm the sign-in.';
@@ -78,7 +79,7 @@
 			setSdk(sdk);
 
 			step = 'Finding the room…';
-			const b = await fetch('/api/board');
+			const b = await api('/api/board');
 			if (b.status === 403) {
 				failed = 'This is a private board. You are signed in, but it is not yours.';
 				return;

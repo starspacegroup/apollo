@@ -18,6 +18,25 @@ export function getSdk(): DiscordSDK | null {
 	return sdk;
 }
 
+/**
+ * The signed pass `/api/activity/token` issued, held in memory. The cookie
+ * alone is not enough: some Discord clients (2026-11-07) never send a
+ * third-party cookie back from the iframe, partitioned or not, and the
+ * board answered 401 straight after a good sign-in. Every API call from the
+ * Activity goes through `api()`, which carries the pass as a bearer header.
+ */
+let pass: string | null = null;
+
+export function setPass(p: string | null | undefined) {
+	pass = p ?? null;
+}
+
+export function api(input: string, init: RequestInit = {}): Promise<Response> {
+	const headers = new Headers(init.headers);
+	if (pass && !headers.has('authorization')) headers.set('authorization', `Bearer ${pass}`);
+	return fetch(input, { ...init, headers, credentials: 'include' });
+}
+
 /** Somebody in the Activity instance, as Discord names them. */
 export interface Participant {
 	id: string;

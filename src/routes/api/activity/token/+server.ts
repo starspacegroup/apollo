@@ -83,5 +83,7 @@ export const POST: RequestHandler = async ({ request, platform, cookies }) => {
 		partitioned: true,
 		maxAge: PASS_LIFE
 	});
-	return json({ access_token, id, name });
+	// The pass goes back in the body too: the page sends it as a bearer
+	// header, for clients whose iframe never returns the cookie.
+	return json({ access_token, id, name, pass });
 };

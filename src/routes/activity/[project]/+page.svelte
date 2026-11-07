@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { brandOf, type Board, type Member, type RoomView } from '$lib/board';
-	import { getSdk } from '$lib/activity';
+	import { api, getSdk } from '$lib/activity';
 	import type { PageData } from './$types';
 
 	/**
@@ -58,7 +58,9 @@
 	const inDiscord = getSdk() !== null;
 	/** Apollo in this project's voice channel right now (apollod voice.json by way of the snapshot). */
 	const live = $derived(
-		board?.voice && board.voice.project.toLowerCase() === data.project.toLowerCase() ? board.voice : null
+		board?.voice && board.voice.project.toLowerCase() === data.project.toLowerCase()
+			? board.voice
+			: null
 	);
 	const proj = $derived(board?.projects.find((p) => p.name === project) ?? null);
 	const brand = $derived(brandOf(proj));
@@ -80,7 +82,9 @@
 			.filter((r) => r.project === project)
 			.sort((a, b) => (sub(a) === null ? -1 : sub(b) === null ? 1 : a.room.localeCompare(b.room)))
 	);
-	const here: RoomView | null = $derived(channels.find((r) => r.room === (callRoom || project)) ?? room);
+	const here: RoomView | null = $derived(
+		channels.find((r) => r.room === (callRoom || project)) ?? room
+	);
 	const inChannel = $derived(!!sub(here));
 	function membersOf(r: RoomView): string[] {
 		return memberEdits[r.room] ?? r.team.map((m) => m.handle.toLowerCase());
@@ -116,7 +120,7 @@
 	// ── the board ──────────────────────────────────────────────────────────
 	async function read() {
 		try {
-			const r = await fetch('/api/board');
+			const r = await api('/api/board');
 			if (r.status === 401 || r.status === 403) {
 				error = 'Your sign-in lapsed. Close and reopen the activity.';
 				return;
@@ -131,7 +135,10 @@
 			const kept: Record<string, string[]> = {};
 			for (const [k, v] of Object.entries(memberEdits)) {
 				const r = (board.rooms ?? []).find((x) => x.room === k);
-				const has = (r?.team ?? []).map((m) => m.handle.toLowerCase()).sort().join(',');
+				const has = (r?.team ?? [])
+					.map((m) => m.handle.toLowerCase())
+					.sort()
+					.join(',');
 				if (has !== [...v].sort().join(',')) kept[k] = v;
 			}
 			memberEdits = kept;
@@ -187,7 +194,9 @@
 		const now = membersOf(here).filter((x) => x !== h);
 		memberEdits = { ...memberEdits, [here.room]: on ? [...now, h] : now };
 		seats = on ? [...seats.filter((x) => x !== h), h] : seats.filter((x) => x !== h);
-		sock.send(JSON.stringify({ t: 'member', room: here.room, handle: m.handle, name: nameOf(m), on }));
+		sock.send(
+			JSON.stringify({ t: 'member', room: here.room, handle: m.handle, name: nameOf(m), on })
+		);
 	}
 
 	async function flip(m: Member, on: boolean) {
@@ -195,7 +204,7 @@
 		flipping = new Set([...flipping, key]);
 		note = null;
 		try {
-			const r = await fetch('/api/intents', {
+			const r = await api('/api/intents', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({
@@ -219,7 +228,7 @@
 	async function connect() {
 		if (sock) return;
 		try {
-			const r = await fetch('/api/activity/voice/ticket', {
+			const r = await api('/api/activity/voice/ticket', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({ project })
@@ -272,7 +281,10 @@
 				break;
 			case 'members':
 				if (typeof m.room === 'string' && Array.isArray(m.members))
-					memberEdits = { ...memberEdits, [m.room]: (m.members as unknown[]).map((x) => String(x).toLowerCase()) };
+					memberEdits = {
+						...memberEdits,
+						[m.room]: (m.members as unknown[]).map((x) => String(x).toLowerCase())
+					};
 				break;
 			case 'seats':
 				seats = Array.isArray(m.seats)
@@ -519,7 +531,9 @@
 					class:active={(here?.room ?? project) === r.room}
 					onclick={() => pick(r)}
 					disabled={!home || (here?.room ?? project) === r.room}
-					title={sub(r) ? `Talk in #${sub(r)}: its members join the call` : `Talk in ${project}'s own room`}
+					title={sub(r)
+						? `Talk in #${sub(r)}: its members join the call`
+						: `Talk in ${project}'s own room`}
 					>#{sub(r) ?? 'general'}{#if sub(r)}<small>{membersOf(r).length}</small>{/if}</button
 				>
 			{/each}
@@ -562,8 +576,9 @@
 											? `Send ${nameOf(m)} out of the call`
 											: `Bring ${nameOf(m)} into the call`}
 									aria-pressed={inCall}
-									aria-label={inCall ? `${nameOf(m)} out of the call` : `${nameOf(m)} into the call`}
-									><span></span></button
+									aria-label={inCall
+										? `${nameOf(m)} out of the call`
+										: `${nameOf(m)} into the call`}><span></span></button
 								>
 							{/if}
 						</div>
@@ -627,11 +642,13 @@
 				{/key}
 			{:else}
 				<p class="caption dim">
-					{#if !home}The machine is away; your words will wait.{:else if seats.length === 0 && inChannel}Nobody is in #{sub(here)}. {#if owner}Switch an agent on to add it to the channel.{:else}Switch an agent into the call, or say "Apollo".{/if}{:else if seats.length === 0}Switch an agent into the call to talk to it, or
-						say "Apollo".{:else if live}Apollo is in the
-						voice channel with you. Just talk.{:else if inDiscord && member}Join the project's
-						voice channel and talk; Apollo follows you in.{:else if member}Tap the mic and
-						talk.{:else}You can watch; the owner grants a seat to speak.{/if}
+					{#if !home}The machine is away; your words will wait.{:else if seats.length === 0 && inChannel}Nobody
+						is in #{sub(here)}. {#if owner}Switch an agent on to add it to the channel.{:else}Switch
+							an agent into the call, or say "Apollo".{/if}{:else if seats.length === 0}Switch an
+						agent into the call to talk to it, or say "Apollo".{:else if live}Apollo is in the voice
+						channel with you. Just talk.{:else if inDiscord && member}Join the project's voice
+						channel and talk; Apollo follows you in.{:else if member}Tap the mic and talk.{:else}You
+						can watch; the owner grants a seat to speak.{/if}
 				</p>
 			{/if}
 			{#if note}<p class="bad small">{note}</p>{/if}
@@ -657,7 +674,14 @@
 							>⌨</button
 						>
 						{#if inDiscord}
-							<span class="mic ear" class:on={!!live} class:hot={(live?.hearing.length ?? 0) > 0} aria-label={live ? 'Apollo is listening in the voice channel' : 'Apollo is not in a voice channel'}>
+							<span
+								class="mic ear"
+								class:on={!!live}
+								class:hot={(live?.hearing.length ?? 0) > 0}
+								aria-label={live
+									? 'Apollo is listening in the voice channel'
+									: 'Apollo is not in a voice channel'}
+							>
 								🎧
 							</span>
 						{:else}

@@ -25,7 +25,13 @@ const pass: Handle = async ({ event, resolve }) => {
 	event.locals.auth = async () => {
 		const session = await original?.();
 		if (session?.user) return session;
-		const raw = event.cookies.get(PASS_COOKIE);
+		// The Activity carries the pass in a header as well as the cookie
+		// (2026-11-07): a Discord client that drops third-party cookies in
+		// its iframe — partitioned or not — signed in, then got 401 from
+		// `/api/board` on the very next request. The header is the same
+		// signed pass, so nothing new is trusted.
+		const bearer = event.request.headers.get('authorization')?.match(/^Bearer\s+(\S+)$/i)?.[1];
+		const raw = event.cookies.get(PASS_COOKIE) ?? bearer;
 		if (!raw) return session ?? null;
 		const p = await readPass(raw, env.AUTH_SECRET ?? '');
 		if (!p) return session ?? null;
