@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # pinned 2026-11-07: ubuntu-latest became 26.04, which Playwright cannot install chromium on
     env:
       AUTH_SECRET: ci-secret-at-least-32-characters
       GITHUB_CLIENT_ID: ci-client
